@@ -2,12 +2,15 @@
 #include "PluginEditor.h"
 
 WebSocketProcessorBase::WebSocketProcessorBase(bool isSynth)
-    : AudioProcessor(BusesProperties()
-          .withOutput("Output", juce::AudioChannelSet::stereo(), true)),
+    : AudioProcessor(isSynth
+          ? BusesProperties()
+                .withOutput("Output", juce::AudioChannelSet::stereo(), true)
+          : BusesProperties()
+                .withInput ("Input",  juce::AudioChannelSet::stereo(), true)
+                .withOutput("Output", juce::AudioChannelSet::stereo(), true)),
       apvts_(*this, nullptr, "Parameters", createParameterLayout()),
       server_(std::make_unique<WebSocketServer>())
 {
-    ignoreUnused(isSynth);
 }
 
 WebSocketProcessorBase::~WebSocketProcessorBase() {
