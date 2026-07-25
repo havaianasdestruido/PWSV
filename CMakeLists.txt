@@ -49,10 +49,12 @@ juce_add_plugin(PatoWebSocketEffect
     IS_SYNTH FALSE
     EDITOR_WANTS_KEYBOARD_FOCUS FALSE
     COPY_PLUGIN_AFTER_BUILD FALSE
-    SOURCES
-        Source/EffectProcessor.h
-        Source/EffectProcessor.cpp
-        ${COMMON_SOURCES}
+)
+
+target_sources(PatoWebSocketEffect PRIVATE
+    Source/EffectProcessor.h
+    Source/EffectProcessor.cpp
+    ${COMMON_SOURCES}
 )
 
 target_compile_definitions(PatoWebSocketEffect
@@ -94,10 +96,12 @@ juce_add_plugin(PatoWebSocketGenerator
     IS_SYNTH TRUE
     EDITOR_WANTS_KEYBOARD_FOCUS FALSE
     COPY_PLUGIN_AFTER_BUILD FALSE
-    SOURCES
-        Source/GeneratorProcessor.h
-        Source/GeneratorProcessor.cpp
-        ${COMMON_SOURCES}
+)
+
+target_sources(PatoWebSocketGenerator PRIVATE
+    Source/GeneratorProcessor.h
+    Source/GeneratorProcessor.cpp
+    ${COMMON_SOURCES}
 )
 
 target_compile_definitions(PatoWebSocketGenerator

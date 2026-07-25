@@ -8,7 +8,7 @@ WebSocketProcessorBase::WebSocketProcessorBase(bool isSynth)
           : BusesProperties()
                 .withInput ("Input",  juce::AudioChannelSet::stereo(), true)
                 .withOutput("Output", juce::AudioChannelSet::stereo(), true)),
-      apvts_(*this, nullptr, "Parameters", createParameterLayout()),
+      apvts_(std::make_unique<juce::AudioProcessorValueTreeState>(*this, nullptr, "Parameters", createParameterLayout())),
       server_(std::make_unique<WebSocketServer>())
 {
 }

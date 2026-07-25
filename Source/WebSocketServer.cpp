@@ -1,10 +1,7 @@
-#include "WebSocketServer.h"
-#include "Sha1.h"
-#include "Base64.h"
-#include <cmath>
-#include <algorithm>
-
 #ifdef _WIN32
+  #ifndef WIN32_LEAN_AND_MEAN
+    #define WIN32_LEAN_AND_MEAN
+  #endif
   #include <winsock2.h>
   #include <ws2tcpip.h>
   typedef int socklen_t;
@@ -20,6 +17,13 @@
   #define SOCKET_ERROR   (-1)
   #define closesocket    ::close
 #endif
+
+#include "WebSocketServer.h"
+#include "Sha1.h"
+#include "Base64.h"
+#include <cmath>
+#include <algorithm>
+#include <string>
 
 static void setNonBlocking(SOCKET s) {
 #ifdef _WIN32
@@ -77,7 +81,7 @@ bool WebSocketServer::start(int port) {
     stop();
     port_ = port;
     lastError_.clear();
-    startThread(4);
+    startThread(Thread::Priority::normal);
     return true;
 }
 
@@ -219,7 +223,7 @@ bool WebSocketServer::performHandshake(int sock) {
     if (keyPos < 0) return false;
 
     keyPos += keyHeader.length();
-    int keyEnd = request.indexOf("\r\n", keyPos);
+    int keyEnd = request.indexOf(keyPos, "\r\n");
     if (keyEnd < 0) return false;
 
     juce::String key = request.substring(keyPos, keyEnd);
@@ -342,5 +346,5 @@ juce::String WebSocketServer::buildJson() {
         "\"playing\":"    + juce::String(p.isPlaying   ? "true" : "false") + ","
         "\"recording\":"  + juce::String(p.isRecording ? "true" : "false") + ","
         "\"looping\":"    + juce::String(p.isLooping   ? "true" : "false")
-    "}";
+        + "}";
 }
