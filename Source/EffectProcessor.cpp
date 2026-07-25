@@ -1,5 +1,5 @@
 #include "EffectProcessor.h"
 
-juce::AudioProcessor* JUCE_CALLTYPE createEffectFilter() {
+juce::AudioProcessor* JUCE_CALLTYPE createPluginFilter() {
     return new EffectProcessor();
 }
