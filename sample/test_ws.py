@@ -1,5 +1,35 @@
 import socket, time, base64, os, json
 
+def recv_frame(s):
+    header = b""
+    while len(header) < 2:
+        chunk = s.recv(2 - len(header))
+        if not chunk:
+            return None
+        header += chunk
+    length = header[1] & 0x7F
+    if length == 126:
+        while len(header) < 4:
+            chunk = s.recv(4 - len(header))
+            if not chunk:
+                return None
+            header += chunk
+        length = int.from_bytes(header[2:4], "big")
+    elif length == 127:
+        while len(header) < 10:
+            chunk = s.recv(10 - len(header))
+            if not chunk:
+                return None
+            header += chunk
+        length = int.from_bytes(header[2:10], "big")
+    payload = b""
+    while len(payload) < length:
+        chunk = s.recv(length - len(payload))
+        if not chunk:
+            return None
+        payload += chunk
+    return payload.decode()
+
 s = socket.socket()
 s.settimeout(5)
 s.connect(('127.0.0.1', 8080))
@@ -18,26 +48,20 @@ s.sendall(req.encode())
 resp = s.recv(4096)
 print("Handshake:", "OK" if b"101" in resp else "FAIL")
 
+note_names = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"]
 for i in range(5):
     time.sleep(1)
-    try:
-        data = s.recv(65536)
-        if not data:
-            print("Frame %d: connection closed" % i)
-            break
-        length = data[1] & 0x7F
-        offset = 2
-        if length == 126:
-            length = int.from_bytes(data[2:4], "big")
-            offset = 4
-        elif length == 127:
-            length = int.from_bytes(data[2:10], "big")
-            offset = 10
-        payload = data[offset:offset+length].decode()
-        d = json.loads(payload)
-        play = "PLAYING" if d["playing"] else "stopped"
-        print("Frame %d: t=%.1fs ppq=%.1f bpm=%.0f bar=%d beat=%.1f [%s]" % (i, d["time_sec"], d["ppq"], d["bpm"], d["bar"], d["beat"], play))
-    except Exception as e:
-        print("Frame %d: error %s" % (i, e))
+    data = recv_frame(s)
+    if data is None:
+        print("Frame %d: connection closed" % i)
         break
+    d = json.loads(data)
+    play = "PLAYING" if d["playing"] else "stopped"
+    notes = d.get("notes", [])
+    note_str = ""
+    if notes:
+        names = ["%s%d" % (note_names[n["note"] % 12], n["note"] // 12 - 1) for n in notes]
+        note_str = " notes=" + ",".join(names)
+    print("Frame %d: proto=%d t=%.1fs ppq=%.1f bpm=%.0f bar=%d beat=%.1f [%s]%s" % (
+        i, d["protocol"], d["time_sec"], d["ppq"], d["bpm"], d["bar"], d["beat"], play, note_str))
 s.close()

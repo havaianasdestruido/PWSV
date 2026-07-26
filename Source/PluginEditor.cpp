@@ -76,7 +76,7 @@ PluginEditor::PluginEditor(WebSocketProcessorBase& p)
     addAndMakeVisible(statusLabel_);
 
     // ── version ───────────────────────────────────────────
-    versionLabel_.setText("v1.0.0", juce::dontSendNotification);
+    versionLabel_.setText("v1.1.0", juce::dontSendNotification);
     versionLabel_.setFont(juce::Font(10.0f, juce::Font::plain));
     versionLabel_.setJustificationType(juce::Justification::centredRight);
     versionLabel_.setColour(juce::Label::textColourId, juce::Colour(0xFF555555));

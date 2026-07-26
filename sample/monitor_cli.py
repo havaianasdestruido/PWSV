@@ -80,10 +80,21 @@ def main():
             sig = "%d/%d" % (d["time_sig"][0], d["time_sig"][1])
             beat_bar = bar(d["beat"])
 
+            note_names = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"]
+            notes = d.get("notes", [])
+            note_str = ""
+            if notes:
+                names = []
+                for n in notes:
+                    note = n["note"] % 12
+                    octave = (n["note"] // 12) - 1
+                    names.append("%s%d" % (note_names[note], octave))
+                note_str = " | Notes: " + " ".join(names)
+
             sys.stdout.write(
                 "\r"
                 " %s | %5.1fs | %6d samp | ppq %7.1f | %3.0f BPM | "
-                "Bar %d Beat %.1f %s | %s %s   "
+                "Bar %d Beat %.1f %s | %s %s%s   "
                 % (
                     status,
                     d["time_sec"],
@@ -95,6 +106,7 @@ def main():
                     beat_bar,
                     sig,
                     "LOOP" if d["looping"] else "",
+                    note_str,
                 )
             )
             sys.stdout.flush()

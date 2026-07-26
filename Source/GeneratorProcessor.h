@@ -6,7 +6,7 @@ public:
     GeneratorProcessor() : WebSocketProcessorBase(true) {}
 
     const juce::String getName() const override { return "Patos WS Generator"; }
-    bool acceptsMidi()  const override { return false; }
+    bool acceptsMidi()  const override { return true; }
     bool producesMidi() const override { return false; }
     bool isMidiEffect() const override { return false; }
     double getTailLengthSeconds() const override { return 0.0; }

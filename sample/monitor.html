@@ -25,7 +25,12 @@
             };
             ws.onmessage = function(e) {
                 var d = JSON.parse(e.data);
+                var noteNames = ["C","C#","D","D#","E","F","F#","G","G#","A","A#","B"];
+                var notes = (d.notes || []).map(function(n) {
+                    return noteNames[n.note % 12] + ((n.note / 12 | 0) - 1);
+                }).join(" ");
                 var out = "";
+                out += "Protocol:    " + d.protocol + "\n";
                 out += "Playing:     " + d.playing + "\n";
                 out += "Recording:   " + d.recording + "\n";
                 out += "Looping:     " + d.looping + "\n";
@@ -35,7 +40,8 @@
                 out += "BPM:         " + d.bpm + "\n";
                 out += "Bar:         " + d.bar + "\n";
                 out += "Beat:        " + d.beat + "\n";
-                out += "Time Sig:    " + d.time_sig[0] + "/" + d.time_sig[1];
+                out += "Time Sig:    " + d.time_sig[0] + "/" + d.time_sig[1] + "\n";
+                out += "Notes:       " + (notes || "(none)");
                 document.getElementById("data").textContent = out;
             };
             ws.onclose = function() {

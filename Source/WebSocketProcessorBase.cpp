@@ -9,7 +9,8 @@ WebSocketProcessorBase::WebSocketProcessorBase(bool isSynth)
                 .withInput ("Input",  juce::AudioChannelSet::stereo(), true)
                 .withOutput("Output", juce::AudioChannelSet::stereo(), true)),
       apvts_(std::make_unique<juce::AudioProcessorValueTreeState>(*this, nullptr, "Parameters", createParameterLayout())),
-      server_(std::make_unique<WebSocketServer>())
+      server_(std::make_unique<WebSocketServer>()),
+      isSynth_(isSynth)
 {
 }
 
@@ -28,7 +29,7 @@ void WebSocketProcessorBase::releaseResources() {
     server_->stop();
 }
 
-void WebSocketProcessorBase::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiBuffer&) {
+void WebSocketProcessorBase::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midi) {
     juce::ScopedNoDenormals noDenormals;
 
     int mode    = static_cast<int>(apvts_->getRawParameterValue("mode")->load());
@@ -44,6 +45,21 @@ void WebSocketProcessorBase::processBlock(juce::AudioBuffer<float>& buffer, juce
         currentPort_ = port;
         server_->stop();
         server_->start(port);
+    }
+
+    for (const auto metadata : midi) {
+        auto msg = metadata.getMessage();
+        int note = msg.getNoteNumber();
+        if (msg.isNoteOn()) {
+            activeNotes_.push_back({ note, msg.getVelocity(), static_cast<int>(msg.getChannel()) });
+        } else if (msg.isNoteOff()) {
+            for (auto it = activeNotes_.begin(); it != activeNotes_.end(); ) {
+                if (it->note == note)
+                    it = activeNotes_.erase(it);
+                else
+                    ++it;
+            }
+        }
     }
 
     auto playHead = getPlayHead();
@@ -66,6 +82,13 @@ void WebSocketProcessorBase::processBlock(juce::AudioBuffer<float>& buffer, juce
             if (barStart && pd.timeSigNum > 0 && pd.ppq >= *barStart) {
                 pd.barNumber = static_cast<int>(*barStart / pd.timeSigNum) + 1;
                 pd.beatInBar = pd.ppq - *barStart;
+            }
+
+            pd.activeNoteCount = static_cast<int>(activeNotes_.size());
+            for (int i = 0; i < pd.activeNoteCount && i < PositionData::MAX_NOTES; ++i) {
+                pd.activeNoteNumbers[i]  = activeNotes_[i].note;
+                pd.activeNoteVelocities[i] = activeNotes_[i].velocity;
+                pd.activeNoteChannels[i] = activeNotes_[i].channel;
             }
 
             server_->updatePosition(pd);

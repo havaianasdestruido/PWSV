@@ -201,6 +201,10 @@ void WebSocketServer::acceptNewClients() {
         int csock = static_cast<int>(accept(listenSocket_, (sockaddr*)&cAddr, &cLen));
         if (csock == -1) break;
         if (clients_.size() >= 8) { closesocket(csock); continue; }
+#ifdef _WIN32
+        u_long block = 0;
+        ioctlsocket(csock, FIONBIO, &block);
+#endif
         if (performHandshake(csock)) {
             setNonBlocking(csock);
             clients_.push_back(csock);
@@ -343,17 +347,30 @@ static juce::String dbl(double v, int prec = 3) {
 
 juce::String WebSocketServer::buildJson() {
     PositionData p = getPosition();
+    juce::String notes("[");
+    for (int i = 0; i < p.activeNoteCount; ++i) {
+        if (i > 0) notes += ",";
+        notes += "{"
+            "\"note\":" + juce::String(p.activeNoteNumbers[i]) + ","
+            "\"vel\":" + juce::String(p.activeNoteVelocities[i]) + ","
+            "\"ch\":" + juce::String(p.activeNoteChannels[i] + 1) +
+            "}";
+    }
+    notes += "]";
+
     return "{"
-        "\"time_sec\":"   + dbl(p.timeInSeconds)   + ","
+        "\"protocol\":2,"
+        "\"time_sec\":"    + dbl(p.timeInSeconds)   + ","
         "\"time_samples\":" + juce::String(p.timeInSamples) + ","
-        "\"ppq\":"        + dbl(p.ppq)             + ","
-        "\"bpm\":"        + dbl(p.bpm, 1)          + ","
-        "\"bar\":"        + juce::String(p.barNumber) + ","
-        "\"beat\":"       + dbl(p.beatInBar, 2)    + ","
-        "\"time_sig\":["  + juce::String(p.timeSigNum) + ","
-                           + juce::String(p.timeSigDen) + "],"
-        "\"playing\":"    + juce::String(p.isPlaying   ? "true" : "false") + ","
-        "\"recording\":"  + juce::String(p.isRecording ? "true" : "false") + ","
-        "\"looping\":"    + juce::String(p.isLooping   ? "true" : "false")
+        "\"ppq\":"         + dbl(p.ppq)             + ","
+        "\"bpm\":"         + dbl(p.bpm, 1)          + ","
+        "\"bar\":"         + juce::String(p.barNumber) + ","
+        "\"beat\":"        + dbl(p.beatInBar, 2)    + ","
+        "\"time_sig\":["   + juce::String(p.timeSigNum) + ","
+                            + juce::String(p.timeSigDen) + "],"
+        "\"playing\":"     + juce::String(p.isPlaying   ? "true" : "false") + ","
+        "\"recording\":"   + juce::String(p.isRecording ? "true" : "false") + ","
+        "\"looping\":"     + juce::String(p.isLooping   ? "true" : "false") + ","
+        "\"notes\":"       + notes
         + "}";
 }
