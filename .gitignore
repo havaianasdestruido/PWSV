@@ -26,3 +26,7 @@ CMakeSettings.json
 obj/
 out/
 compile_commands.json
+*.7z
+*.sln.docstates
+installer/7z.sfx
+installer/payload.7z
