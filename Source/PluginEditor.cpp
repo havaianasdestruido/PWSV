@@ -75,6 +75,13 @@ PluginEditor::PluginEditor(WebSocketProcessorBase& p)
     statusLabel_.setColour(juce::Label::textColourId, juce::Colours::grey);
     addAndMakeVisible(statusLabel_);
 
+    // ── version ───────────────────────────────────────────
+    versionLabel_.setText("v1.0.0", juce::dontSendNotification);
+    versionLabel_.setFont(juce::Font(10.0f, juce::Font::plain));
+    versionLabel_.setJustificationType(juce::Justification::centredRight);
+    versionLabel_.setColour(juce::Label::textColourId, juce::Colour(0xFF555555));
+    addAndMakeVisible(versionLabel_);
+
     updateSliderForMode(0);
     startTimerHz(10);
 }
@@ -126,6 +133,8 @@ void PluginEditor::resized() {
     area.removeFromTop(10);
 
     statusLabel_.setBounds(area.removeFromTop(20));
+    area.removeFromTop(4);
+    versionLabel_.setBounds(area.removeFromBottom(16));
 }
 
 void PluginEditor::timerCallback() {

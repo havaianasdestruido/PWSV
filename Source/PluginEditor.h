@@ -28,6 +28,7 @@ private:
     juce::Label   portLabel_;
     juce::Slider  portSlider_;
     juce::Label   statusLabel_;
+    juce::Label   versionLabel_;
 
     std::unique_ptr<juce::AudioProcessorValueTreeState::ComboBoxAttachment> modeAttach_;
     std::unique_ptr<juce::AudioProcessorValueTreeState::ComboBoxAttachment> beatDivAttach_;
