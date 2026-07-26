@@ -1,0 +1,5 @@
+;!@Install@!UTF-8!
+Title="Pato's WebSocket VST Installer"
+BeginPrompt="This will install Pato's WebSocket VST plugins.\n\nClick OK to continue, or Cancel to exit."
+RunProgram="setup.bat"
+;!@InstallEnd@!

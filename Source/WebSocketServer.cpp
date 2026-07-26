@@ -251,8 +251,17 @@ void WebSocketServer::readFromClients() {
     char tmp[128];
     for (size_t i = clients_.size(); i-- > 0;) {
         int n = recv(clients_[i], tmp, sizeof(tmp), 0);
-        if (n <= 0)
+        if (n == 0 || n == -1) {
+#ifdef _WIN32
+            int err = WSAGetLastError();
+            if (n == -1 && (err == WSAEWOULDBLOCK || err == WSAEINPROGRESS))
+                continue;
+#else
+            if (n == -1 && (errno == EAGAIN || errno == EWOULDBLOCK))
+                continue;
+#endif
             disconnectClient(i);
+        }
     }
 }
 
