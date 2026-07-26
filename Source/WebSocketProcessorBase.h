@@ -20,6 +20,8 @@ public:
 
     double getSampleRate() const { return sampleRate_; }
     bool isSynth() const { return isSynth_; }
+    int getMidiEventCount() const { return midiEventCount_.load(); }
+    int getActiveNoteCount() const { return activeNoteCount_.load(); }
 
 protected:
     virtual void processAudio(juce::AudioBuffer<float>& buffer) = 0;
@@ -35,6 +37,8 @@ private:
 
     struct ActiveNote { int note; int velocity; int channel; };
     std::vector<ActiveNote> activeNotes_;
+    std::atomic<int> midiEventCount_ { 0 };
+    std::atomic<int> activeNoteCount_ { 0 };
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(WebSocketProcessorBase)
 };

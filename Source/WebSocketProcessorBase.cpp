@@ -49,6 +49,7 @@ void WebSocketProcessorBase::processBlock(juce::AudioBuffer<float>& buffer, juce
 
     for (const auto metadata : midi) {
         auto msg = metadata.getMessage();
+        midiEventCount_.fetch_add(1);
         int note = msg.getNoteNumber();
         if (msg.isNoteOn()) {
             activeNotes_.push_back({ note, msg.getVelocity(), static_cast<int>(msg.getChannel()) });
@@ -61,6 +62,8 @@ void WebSocketProcessorBase::processBlock(juce::AudioBuffer<float>& buffer, juce
             }
         }
     }
+
+    activeNoteCount_.store(static_cast<int>(activeNotes_.size()));
 
     auto playHead = getPlayHead();
     if (playHead) {

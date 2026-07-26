@@ -76,7 +76,7 @@ PluginEditor::PluginEditor(WebSocketProcessorBase& p)
     addAndMakeVisible(statusLabel_);
 
     // ── version ───────────────────────────────────────────
-    versionLabel_.setText("v1.1.0", juce::dontSendNotification);
+    versionLabel_.setText("v1.1.1", juce::dontSendNotification);
     versionLabel_.setFont(juce::Font(10.0f, juce::Font::plain));
     versionLabel_.setJustificationType(juce::Justification::centredRight);
     versionLabel_.setColour(juce::Label::textColourId, juce::Colour(0xFF555555));
@@ -157,7 +157,9 @@ void PluginEditor::timerCallback() {
         int n = server->getConnectedClientCount();
         statusLabel_.setText("Server running on port " +
             juce::String(static_cast<int>(portSlider_.getValue())) +
-            " - " + juce::String(n) + " client" + (n == 1 ? "" : "s"),
+            " - " + juce::String(n) + " client" + (n == 1 ? "" : "s") +
+            " | MIDI: " + juce::String(proc_.getMidiEventCount()) +
+            " | Active: " + juce::String(proc_.getActiveNoteCount()),
             juce::dontSendNotification);
         statusLabel_.setColour(juce::Label::textColourId, juce::Colours::green);
     } else {
