@@ -1,0 +1,158 @@
+# Labels for automated PR categorization based on changed files
+# This labeler configuration helps organize pull requests by their domain
+
+# Build System & Configuration
+build:
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'CMakeLists.txt'
+          - 'cmake/**'
+          - '*.cmake'
+          - 'build/**'
+          - 'Makefile'
+          - '*.bat'
+
+ci:
+  - changed-files:
+      - any-glob-to-any-file:
+          - '.github/workflows/**'
+          - '.github/actions/**'
+          - '.gitignore'
+          - '.gitattributes'
+
+# Documentation
+documentation:
+  - changed-files:
+      - any-glob-to-any-file:
+          - '*.md'
+          - '*.txt'
+          - 'docs/**'
+          - 'LICENSE'
+          - 'CHANGELOG'
+
+# Core VST Plugin
+vst-plugin:
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'src/**/*.cpp'
+          - 'src/**/*.h'
+          - 'src/**/*.hpp'
+          - 'include/**'
+
+# WebSocket Implementation
+websocket:
+  - changed-files:
+      - any-glob-to-any-file:
+          - '**/websocket*'
+          - '**/ws/**'
+          - '**/network/**'
+          - '**/communication/**'
+
+# Audio Processing
+audio:
+  - changed-files:
+      - any-glob-to-any-file:
+          - '**/audio/**'
+          - '**/dsp/**'
+          - '**/processor/**'
+          - '**/*processor*.cpp'
+          - '**/*processor*.h'
+
+# User Interface
+ui:
+  - changed-files:
+      - any-glob-to-any-file:
+          - '**/ui/**'
+          - '**/gui/**'
+          - '**/*editor*.cpp'
+          - '**/*editor*.h'
+          - '**/view/**'
+
+# Tests
+tests:
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'test/**'
+          - 'tests/**'
+          - '**/test*.cpp'
+          - '**/test*.h'
+          - '**/*_test.cpp'
+
+# Windows-specific code
+windows:
+  - changed-files:
+      - any-glob-to-any-file:
+          - '**/*win*'
+          - '**/*windows*'
+          - '*.bat'
+          - '**/windows/**'
+
+# macOS-specific code
+macos:
+  - changed-files:
+      - any-glob-to-any-file:
+          - '**/*mac*'
+          - '**/*osx*'
+          - '**/macos/**'
+          - '*.mm'
+
+# Linux-specific code
+linux:
+  - changed-files:
+      - any-glob-to-any-file:
+          - '**/*linux*'
+          - '**/linux/**'
+
+# Dependencies & Third-party
+dependencies:
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'external/**'
+          - 'third_party/**'
+          - 'vendor/**'
+          - '**/lib/**'
+          - 'conanfile.txt'
+          - 'vcpkg.json'
+
+# Resource files
+resources:
+  - changed-files:
+      - any-glob-to-any-file:
+          - '**/*.json'
+          - '**/*.xml'
+          - '**/*.yaml'
+          - '**/*.yml'
+          - '**/*.png'
+          - '**/*.jpg'
+          - '**/*.svg'
+          - 'resources/**'
+          - 'assets/**'
+
+# Configuration files
+config:
+  - changed-files:
+      - any-glob-to-any-file:
+          - '.vscode/**'
+          - '.editorconfig'
+          - 'clang-format'
+          - 'clang-tidy'
+          - '.clang-*'
+          - '.cmake-format'
+
+# Type labels
+type/bug:
+  - changed-files:
+      - any-glob-to-any-file:
+          - '**/bugfix/*'
+          - '**/bug/*'
+
+type/feature:
+  - changed-files:
+      - any-glob-to-any-file:
+          - '**/feature/*'
+          - '**/feat/*'
+
+type/refactor:
+  - changed-files:
+      - any-glob-to-any-file:
+          - '**/refactor/*'
