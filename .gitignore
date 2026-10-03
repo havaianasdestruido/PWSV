@@ -37,6 +37,9 @@ docusaurus/node_modules/
 docusaurus/.docusaurus/
 .docusaurus/
 .npm/
+docusaurus/build/
+docs/
+*.js.map
 
 # Jekyll
 _site/
