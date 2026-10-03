@@ -30,3 +30,15 @@ compile_commands.json
 *.sln.docstates
 installer/7z.sfx
 installer/payload.7z
+
+# Node / Docusaurus
+node_modules/
+docusaurus/node_modules/
+docusaurus/.docusaurus/
+.docusaurus/
+.npm/
+
+# Jekyll
+_site/
+.jekyll-cache/
+.jekyll-metadata

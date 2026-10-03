@@ -1,0 +1,39 @@
+# Site settings
+title: "PWSV — Pato's WebSocket VST"
+email: "havaianasdestruido@gmail.com"
+description: >-
+  High-performance, ultra-low latency WebSocket DAW telemetry and MIDI streaming VST3 & CLAP audio plugin suite built with JUCE 8.
+baseurl: "" # the subpath of your site, e.g. /blog
+url: "https://havaianasdestruido.github.io" # the base hostname & protocol for your site
+github_username: havaianasdestruido
+repository: havaianasdestruido/PWSV
+
+# Build settings
+markdown: kramdown
+theme: null
+
+# Exclude unnecessary directories from Jekyll build
+exclude:
+  - "docusaurus/node_modules"
+  - "docusaurus/src"
+  - "docusaurus/docs"
+  - "docusaurus/static"
+  - "docusaurus/docusaurus.config.js"
+  - "docusaurus/sidebars.js"
+  - "docusaurus/package.json"
+  - "docusaurus/package-lock.json"
+  - "Source"
+  - "CMakeLists.txt"
+  - "installer"
+  - "sample"
+  - ".github"
+  - "node_modules"
+  - "package.json"
+  - "package-lock.json"
+  - "build"
+  - "Gemfile"
+  - "Gemfile.lock"
+
+# Keep the /docs directory where Docusaurus generates its static output
+keep_files:
+  - "docs"

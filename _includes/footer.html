@@ -1,0 +1,59 @@
+<footer class="site-footer">
+  <div class="container footer-container">
+    <div class="footer-col brand-col">
+      <div class="footer-brand">
+        <img src="{{ '/assets/images/logo.svg' | relative_url }}" alt="PWSV Logo" width="32" height="32">
+        <span class="footer-brand-title">PWSV</span>
+      </div>
+      <p class="footer-tagline">
+        Ultra-low latency WebSocket DAW telemetry & polyphonic MIDI streaming for live visuals, stage production, and game engines.
+      </p>
+      <div class="footer-meta">
+        Built with JUCE 8, CLAP & Docusaurus. Open source under MIT License.
+      </div>
+    </div>
+    
+    <div class="footer-col">
+      <h4 class="footer-heading">Documentation</h4>
+      <ul class="footer-links">
+        <li><a href="{{ '/docs/' | relative_url }}">Introduction</a></li>
+        <li><a href="{{ '/docs/getting-started/quickstart' | relative_url }}">Quick Start</a></li>
+        <li><a href="{{ '/docs/getting-started/installation' | relative_url }}">Installation Guide</a></li>
+        <li><a href="{{ '/docs/protocol/overview' | relative_url }}">WebSocket Protocol v2</a></li>
+        <li><a href="{{ '/docs/cpp-api/' | relative_url }}">C++ API Reference</a></li>
+      </ul>
+    </div>
+    
+    <div class="footer-col">
+      <h4 class="footer-heading">Integrations</h4>
+      <ul class="footer-links">
+        <li><a href="{{ '/docs/integrations/touchdesigner' | relative_url }}">TouchDesigner</a></li>
+        <li><a href="{{ '/docs/integrations/obs-streaming' | relative_url }}">OBS Studio Overlays</a></li>
+        <li><a href="{{ '/docs/integrations/unreal-unity' | relative_url }}">Unreal Engine & Unity</a></li>
+        <li><a href="{{ '/docs/client-sdks/terminal-visualizer' | relative_url }}">Terminal Visualizer</a></li>
+        <li><a href="{{ '/docs/integrations/max-msp-puredata' | relative_url }}">Max/MSP & Pure Data</a></li>
+      </ul>
+    </div>
+    
+    <div class="footer-col">
+      <h4 class="footer-heading">Ecosystem</h4>
+      <ul class="footer-links">
+        <li><a href="https://github.com/{{ site.repository }}" target="_blank" rel="noopener">GitHub Repository</a></li>
+        <li><a href="https://github.com/{{ site.repository }}/releases" target="_blank" rel="noopener">Release Downloads</a></li>
+        <li><a href="{{ '/docs/build-and-dev/cmake' | relative_url }}">Build from Source</a></li>
+        <li><a href="{{ '/docs/faq-and-troubleshooting' | relative_url }}">Troubleshooting & FAQ</a></li>
+        <li><a href="{{ '/docs/changelog' | relative_url }}">Changelog</a></li>
+      </ul>
+    </div>
+  </div>
+  
+  <div class="footer-bottom">
+    <div class="container footer-bottom-inner">
+      <div>© {{ site.time | date: "%Y" }} PWSV (Pato's WebSocket VST). Developed by PatoFlamejanteTV.</div>
+      <div class="footer-bottom-links">
+        <a href="{{ '/docs/' | relative_url }}">Docs (/docs)</a>
+        <a href="https://github.com/{{ site.repository }}/blob/main/LICENSE">MIT License</a>
+      </div>
+    </div>
+  </div>
+</footer>

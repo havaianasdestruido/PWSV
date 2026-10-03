@@ -1,6 +1,34 @@
-#include "WebSocketProcessorBase.h"
-#include "PluginEditor.h"
+---
+sidebar_position: 2
+title: "Audio Processor & Threading"
+description: "Deep dive into the audio processing lifecycle, APVTS parameters, and real-time safe state management."
+---
 
+# Audio Processor & Threading
+
+The audio processing core of PWSV is implemented in `WebSocketProcessorBase`, which inherits from `juce::AudioProcessor`.
+
+---
+
+## Class Hierarchy
+
+```text
+       juce::AudioProcessor
+                 │
+                 ▼
+      WebSocketProcessorBase  ◄── owns ──► AudioProcessorValueTreeState (APVTS)
+        │                 │   ◄── owns ──► WebSocketServer
+        ▼                 ▼
+ EffectProcessor   GeneratorProcessor
+```
+
+---
+
+## Processor Lifecycle
+
+### 1. Construction
+When the host instantiates the plugin:
+```cpp
 WebSocketProcessorBase::WebSocketProcessorBase(bool isSynth)
     : AudioProcessor(isSynth
           ? BusesProperties()
@@ -8,30 +36,40 @@ WebSocketProcessorBase::WebSocketProcessorBase(bool isSynth)
           : BusesProperties()
                 .withInput ("Input",  juce::AudioChannelSet::stereo(), true)
                 .withOutput("Output", juce::AudioChannelSet::stereo(), true)),
-      apvts_(std::make_unique<juce::AudioProcessorValueTreeState>(*this, nullptr, "Parameters", createParameterLayout())),
+      apvts_(std::make_unique<juce::AudioProcessorValueTreeState>(
+          *this, nullptr, "Parameters", createParameterLayout())),
       server_(std::make_unique<WebSocketServer>()),
       isSynth_(isSynth)
 {
 }
+```
+- Bus layouts are assigned depending on whether the plugin is configured as a Synth (`Generator`) or Effect.
+- The `AudioProcessorValueTreeState` (APVTS) parameter layout is constructed.
+- An instance of `WebSocketServer` is allocated.
 
-WebSocketProcessorBase::~WebSocketProcessorBase() {
-    server_->stop();
-}
-
+### 2. `prepareToPlay`
+Called by the DAW before playback starts or when sample rate changes:
+```cpp
 void WebSocketProcessorBase::prepareToPlay(double sr, int) {
     sampleRate_ = sr;
     int port = static_cast<int>(apvts_->getRawParameterValue("port")->load());
     currentPort_ = port;
     server_->start(port);
 }
+```
+- Initializes the sample rate.
+- Reads the active port parameter and starts the `WebSocketServer` background thread.
 
-void WebSocketProcessorBase::releaseResources() {
-    server_->stop();
-}
-
-void WebSocketProcessorBase::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midi) {
+### 3. `processBlock`
+Called continuously for every audio buffer block:
+```cpp
+void WebSocketProcessorBase::processBlock(
+    juce::AudioBuffer<float>& buffer, 
+    juce::MidiBuffer& midi) 
+{
     juce::ScopedNoDenormals noDenormals;
 
+    // 1. Sync parameters to server atomically
     int mode    = static_cast<int>(apvts_->getRawParameterValue("mode")->load());
     float rate  = apvts_->getRawParameterValue("rate")->load();
     int beatDiv = static_cast<int>(apvts_->getRawParameterValue("beatDiv")->load());
@@ -40,6 +78,7 @@ void WebSocketProcessorBase::processBlock(juce::AudioBuffer<float>& buffer, juce
     server_->setRate(rate);
     server_->setBeatDivision(beatDiv);
 
+    // 2. Handle dynamic port changes
     int port = static_cast<int>(apvts_->getRawParameterValue("port")->load());
     if (port != currentPort_) {
         currentPort_ = port;
@@ -47,6 +86,7 @@ void WebSocketProcessorBase::processBlock(juce::AudioBuffer<float>& buffer, juce
         server_->start(port);
     }
 
+    // 3. Process MIDI notes
     for (const auto metadata : midi) {
         auto msg = metadata.getMessage();
         midiEventCount_.fetch_add(1);
@@ -63,9 +103,9 @@ void WebSocketProcessorBase::processBlock(juce::AudioBuffer<float>& buffer, juce
             }
         }
     }
-
     activeNoteCount_.store(static_cast<int>(activeNotes_.size()));
 
+    // 4. Query DAW playhead position
     auto playHead = getPlayHead();
     if (playHead) {
         auto info = playHead->getPosition();
@@ -103,34 +143,16 @@ void WebSocketProcessorBase::processBlock(juce::AudioBuffer<float>& buffer, juce
         }
     }
 
+    // 5. Invoke virtual audio processor
     processAudio(buffer);
 }
+```
 
-juce::AudioProcessorEditor* WebSocketProcessorBase::createEditor() {
-    return new PluginEditor(*this);
+### 4. `releaseResources`
+Called when playback stops or the plugin is deactivated:
+```cpp
+void WebSocketProcessorBase::releaseResources() {
+    server_->stop();
 }
-
-juce::AudioProcessorValueTreeState::ParameterLayout
-WebSocketProcessorBase::createParameterLayout()
-{
-    juce::AudioProcessorValueTreeState::ParameterLayout layout;
-
-    layout.add(std::make_unique<juce::AudioParameterChoice>(
-        juce::ParameterID{ "mode", 1 }, "Mode",
-        juce::StringArray{ "Hz", "Beats", "Minutes" }, 0));
-
-    layout.add(std::make_unique<juce::AudioParameterFloat>(
-        juce::ParameterID{ "rate", 1 }, "Rate",
-        juce::NormalisableRange<float>(1.0f, 240.0f, 0.1f), 10.0f));
-
-    layout.add(std::make_unique<juce::AudioParameterChoice>(
-        juce::ParameterID{ "beatDiv", 1 }, "Beat Division",
-        juce::StringArray{ "1/1", "1/2", "1/4", "1/8", "1/16", "1/32",
-                           "3/4", "3/8", "3/16", "3/32" }, 2));
-
-    layout.add(std::make_unique<juce::AudioParameterFloat>(
-        juce::ParameterID{ "port", 1 }, "Port",
-        juce::NormalisableRange<float>(1024.0f, 65535.0f, 1.0f), 8080.0f));
-
-    return layout;
-}
+```
+Signals the background server thread to stop and cleanly shuts down all active client sockets.
