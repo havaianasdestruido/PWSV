@@ -36,7 +36,7 @@ jobs:
           cache-dependency-path: docusaurus/package-lock.json
 
       - name: Setup Ruby and Jekyll
-        uses: ruby/setup-ruby@2a18d0513237a4049363a520f850402b6637b923 # v1.222.0
+        uses: ruby/setup-ruby@277ba2a127aba66d45bad0fa2dc56f80dbfedffa # v1.222.0
         with:
           ruby-version: '3.3'
           bundler-cache: true
