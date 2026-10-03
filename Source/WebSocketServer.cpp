@@ -278,7 +278,8 @@ void WebSocketServer::disconnectClient(size_t idx) {
 // ── send ─────────────────────────────────────────────────────
 
 void WebSocketServer::sendTextFrame(int sock, const juce::String& payload) {
-    auto len = static_cast<size_t>(payload.length());
+    auto utf8 = payload.toRawUTF8();
+    auto len = static_cast<size_t>(payload.getNumBytesAsUTF8());
     uint8_t header[10];
     int headerLen = 0;
 
@@ -299,7 +300,7 @@ void WebSocketServer::sendTextFrame(int sock, const juce::String& payload) {
     }
 
     send(sock, (const char*)header, headerLen, 0);
-    send(sock, payload.toRawUTF8(), static_cast<int>(len), 0);
+    send(sock, utf8, static_cast<int>(len), 0);
 }
 
 void WebSocketServer::sendToAll(const juce::String& payload) {

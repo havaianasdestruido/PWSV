@@ -1,0 +1,27 @@
+{
+  "name": "pwsv",
+  "version": "1.1.1",
+  "description": "High-performance WebSocket DAW Telemetry & MIDI Streaming VST3 / CLAP Plugin",
+  "private": true,
+  "scripts": {
+    "build:docs": "cd docusaurus && npm run build && cd .. && rm -rf docs && cp -r docusaurus/build docs",
+    "build": "npm run build:docs",
+    "docs:dev": "cd docusaurus && npm start",
+    "serve": "node server.js",
+    "start": "node server.js"
+  },
+  "keywords": [
+    "vst3",
+    "clap",
+    "juce",
+    "websocket",
+    "daw",
+    "telemetry",
+    "midi",
+    "audio-plugin",
+    "docusaurus",
+    "jekyll"
+  ],
+  "author": "PatoFlamejanteTV",
+  "license": "MIT"
+}
