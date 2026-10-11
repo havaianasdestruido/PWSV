@@ -30,7 +30,7 @@ static void setNonBlocking(SOCKET s) {
     u_long mode = 1;
     ioctlsocket(s, FIONBIO, &mode);
 #else
-    int flags = fcntl(s, FGETFL, 0);
+    int flags = fcntl(s, F_GETFL, 0);
     fcntl(s, F_SETFL, flags | O_NONBLOCK);
 #endif
 }
