@@ -12,6 +12,8 @@ WebSocketProcessorBase::WebSocketProcessorBase(bool isSynth)
       server_(std::make_unique<WebSocketServer>()),
       isSynth_(isSynth)
 {
+    // Pre-allocate to prevent real-time memory allocation in processBlock
+    activeNotes_.reserve(PositionData::MAX_NOTES);
 }
 
 WebSocketProcessorBase::~WebSocketProcessorBase() {
@@ -55,11 +57,14 @@ void WebSocketProcessorBase::processBlock(juce::AudioBuffer<float>& buffer, juce
         if (msg.isNoteOn()) {
             activeNotes_.push_back({ note, msg.getVelocity(), ch });
         } else if (msg.isNoteOff()) {
-            for (auto it = activeNotes_.begin(); it != activeNotes_.end(); ) {
-                if (it->note == note && it->channel == ch)
-                    it = activeNotes_.erase(it);
-                else
-                    ++it;
+            for (size_t i = 0; i < activeNotes_.size(); ) {
+                if (activeNotes_[i].note == note && activeNotes_[i].channel == ch) {
+                    // O(1) removal, avoids vector shifting in audio thread
+                    activeNotes_[i] = activeNotes_.back();
+                    activeNotes_.pop_back();
+                } else {
+                    ++i;
+                }
             }
         }
     }
