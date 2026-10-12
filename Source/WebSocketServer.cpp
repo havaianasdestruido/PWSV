@@ -348,30 +348,35 @@ static juce::String dbl(double v, int prec = 3) {
 
 juce::String WebSocketServer::buildJson() {
     PositionData p = getPosition();
-    juce::String notes("[");
-    for (int i = 0; i < p.activeNoteCount; ++i) {
-        if (i > 0) notes += ",";
-        notes += "{"
-            "\"note\":" + juce::String(p.activeNoteNumbers[i]) + ","
-            "\"vel\":" + juce::String(p.activeNoteVelocities[i]) + ","
-            "\"ch\":" + juce::String(p.activeNoteChannels[i] + 1) +
-            "}";
-    }
-    notes += "]";
 
-    return "{"
-        "\"protocol\":2,"
-        "\"time_sec\":"    + dbl(p.timeInSeconds)   + ","
-        "\"time_samples\":" + juce::String(p.timeInSamples) + ","
-        "\"ppq\":"         + dbl(p.ppq)             + ","
-        "\"bpm\":"         + dbl(p.bpm, 1)          + ","
-        "\"bar\":"         + juce::String(p.barNumber) + ","
-        "\"beat\":"        + dbl(p.beatInBar, 2)    + ","
-        "\"time_sig\":["   + juce::String(p.timeSigNum) + ","
-                            + juce::String(p.timeSigDen) + "],"
-        "\"playing\":"     + juce::String(p.isPlaying   ? "true" : "false") + ","
-        "\"recording\":"   + juce::String(p.isRecording ? "true" : "false") + ","
-        "\"looping\":"     + juce::String(p.isLooping   ? "true" : "false") + ","
-        "\"notes\":"       + notes
-        + "}";
+    juce::String json;
+    // Pre-allocate enough memory to hold maximum possible notes without reallocations.
+    // Base JSON is ~200 chars. Each note is ~30 chars. Max 128 notes. Total ~4000 chars.
+    json.preallocateBytes(4096);
+
+    json << "{"
+         << "\"protocol\":2,"
+         << "\"time_sec\":"    << dbl(p.timeInSeconds)   << ","
+         << "\"time_samples\":" << juce::String(p.timeInSamples) << ","
+         << "\"ppq\":"         << dbl(p.ppq)             << ","
+         << "\"bpm\":"         << dbl(p.bpm, 1)          << ","
+         << "\"bar\":"         << juce::String(p.barNumber) << ","
+         << "\"beat\":"        << dbl(p.beatInBar, 2)    << ","
+         << "\"time_sig\":["   << juce::String(p.timeSigNum) << "," << juce::String(p.timeSigDen) << "],"
+         << "\"playing\":"     << (p.isPlaying   ? "true" : "false") << ","
+         << "\"recording\":"   << (p.isRecording ? "true" : "false") << ","
+         << "\"looping\":"     << (p.isLooping   ? "true" : "false") << ","
+         << "\"notes\":[";
+
+    for (int i = 0; i < p.activeNoteCount; ++i) {
+        if (i > 0) json << ",";
+        json << "{"
+             << "\"note\":" << juce::String(p.activeNoteNumbers[i]) << ","
+             << "\"vel\":" << juce::String(p.activeNoteVelocities[i]) << ","
+             << "\"ch\":" << juce::String(p.activeNoteChannels[i] + 1)
+             << "}";
+    }
+    json << "]}";
+
+    return json;
 }
