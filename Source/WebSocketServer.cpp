@@ -179,9 +179,12 @@ void WebSocketServer::run() {
 
         readFromClients();
 
-        if (shouldSend()) {
-            sendToAll(buildJson());
-            afterSend();
+        if (!clients_.empty()) {
+            PositionData p = getPosition();
+            if (shouldSend(p)) {
+                sendToAll(buildJson(p));
+                afterSend(p);
+            }
         }
     }
 
@@ -277,43 +280,34 @@ void WebSocketServer::disconnectClient(size_t idx) {
 
 // ── send ─────────────────────────────────────────────────────
 
-void WebSocketServer::sendTextFrame(int sock, const juce::String& payload) {
+void WebSocketServer::sendToAll(const juce::String& payload) {
+    if (clients_.empty()) return;
     auto utf8 = payload.toRawUTF8();
     auto len = static_cast<size_t>(payload.getNumBytesAsUTF8());
-    uint8_t header[10];
-    int headerLen = 0;
-
-    header[0] = 0x81;
+    std::vector<uint8_t> buffer;
+    buffer.reserve(10 + len);
+    buffer.push_back(0x81);
     if (len < 126) {
-        header[1] = static_cast<uint8_t>(len);
-        headerLen = 2;
+        buffer.push_back(static_cast<uint8_t>(len));
     } else if (len < 65536) {
-        header[1] = 126;
-        header[2] = static_cast<uint8_t>((len >> 8) & 0xFF);
-        header[3] = static_cast<uint8_t>(len & 0xFF);
-        headerLen = 4;
+        buffer.push_back(126);
+        buffer.push_back(static_cast<uint8_t>((len >> 8) & 0xFF));
+        buffer.push_back(static_cast<uint8_t>(len & 0xFF));
     } else {
-        header[1] = 127;
+        buffer.push_back(127);
         for (int i = 7; i >= 0; --i)
-            header[2 + (7 - i)] = static_cast<uint8_t>((len >> (i * 8)) & 0xFF);
-        headerLen = 10;
+            buffer.push_back(static_cast<uint8_t>((len >> (i * 8)) & 0xFF));
     }
-
-    send(sock, (const char*)header, headerLen, 0);
-    send(sock, utf8, static_cast<int>(len), 0);
-}
-
-void WebSocketServer::sendToAll(const juce::String& payload) {
+    buffer.insert(buffer.end(), utf8, utf8 + len);
     for (size_t i = clients_.size(); i-- > 0;) {
-        sendTextFrame(clients_[i], payload);
+        send(clients_[i], (const char*)buffer.data(), static_cast<int>(buffer.size()), 0);
     }
 }
 
 // ── rate / beat logic ────────────────────────────────────────
 
-bool WebSocketServer::shouldSend() {
+bool WebSocketServer::shouldSend(const PositionData& p) {
     int m = mode_.load();
-    PositionData p = getPosition();
 
     if (m == 1) {
         bool justStarted = p.isPlaying && !wasPlaying_;
@@ -335,8 +329,8 @@ bool WebSocketServer::shouldSend() {
     return elapsed >= (1.0 / hz);
 }
 
-void WebSocketServer::afterSend() {
-    lastSentPpq_  = getPosition().ppq;
+void WebSocketServer::afterSend(const PositionData& p) {
+    lastSentPpq_  = p.ppq;
     lastSendTime_ = std::chrono::steady_clock::now();
 }
 
@@ -346,9 +340,7 @@ static juce::String dbl(double v, int prec = 3) {
     return juce::String(v, prec);
 }
 
-juce::String WebSocketServer::buildJson() {
-    PositionData p = getPosition();
-
+juce::String WebSocketServer::buildJson(const PositionData& p) {
     juce::String json;
     // Pre-allocate enough memory to hold maximum possible notes without reallocations.
     // Base JSON is ~200 chars. Each note is ~30 chars. Max 128 notes. Total ~4000 chars.
