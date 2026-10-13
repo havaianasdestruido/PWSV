@@ -5,3 +5,10 @@
 ## 2024-11-20 - String concatenation overhead in JSON serialization
 **Learning:** `WebSocketServer::buildJson()` was using many `juce::String` concatenations (`+`) which internally allocates and copies memory for every operation. This was happening on the WebSocket send thread periodically. Using a single `juce::String` with `preallocateBytes` and `operator<<` drastically reduces heap allocations and copying overhead.
 **Action:** Identified redundant heap string concatenations, replaced with pre-allocated `juce::String` and `operator<<`.
+## 2024-05-24 - Nagle's Algorithm latency in WebSocket Framing
+**Learning:** Sending the WebSocket header and payload in two separate `send()` calls without `TCP_NODELAY` triggers Nagle's algorithm, causing the payload to be delayed by up to 200ms while waiting for the header's ACK.
+**Action:** Always batch small protocol headers with their payloads into a single `send()` buffer or use `writev` / set `TCP_NODELAY`.
+
+## 2024-05-24 - Redundant Mutex Locks in Tick Loops
+**Learning:** Calling a state-fetching function (`getPosition()`) multiple times within a single tick sequence (`shouldSend`, `buildJson`, `afterSend`) acquires the mutex and copies a 1.5KB struct 3 times per loop, increasing audio-thread contention risk.
+**Action:** Fetch thread-safe state exactly once per loop iteration and pass it by const reference to consumer functions.

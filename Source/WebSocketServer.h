@@ -34,13 +34,12 @@ private:
     void acceptNewClients();
     void readFromClients();
     bool performHandshake(int sock);
-    void sendTextFrame(int sock, const juce::String& payload);
     void sendToAll(const juce::String& payload);
     void disconnectClient(size_t index);
 
-    bool shouldSend();
-    void afterSend();
-    juce::String buildJson();
+    bool shouldSend(const PositionData& p);
+    void afterSend(const PositionData& p);
+    juce::String buildJson(const PositionData& p);
 
     PositionData getPosition() const;
 
