@@ -100,8 +100,14 @@ void WebSocketServer::stop() {
 // ── setters (called from any thread) ─────────────────────────
 
 void WebSocketServer::updatePosition(const PositionData& d) {
-    std::lock_guard<std::mutex> lk(posLock_);
-    pos_ = d;
+    // try_lock prevents priority inversion / blocking in the audio thread.
+    // If the lock is held by the server thread, we simply skip this update.
+    // Since processBlock runs much faster than the websocket send rate,
+    // skipping an occasional update is perfectly fine and avoids audio dropouts.
+    if (posLock_.try_lock()) {
+        pos_ = d;
+        posLock_.unlock();
+    }
 }
 
 void WebSocketServer::setMode(int m)           { mode_.store(m); }
