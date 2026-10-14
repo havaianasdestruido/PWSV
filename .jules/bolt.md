@@ -12,3 +12,7 @@
 ## 2024-05-24 - Redundant Mutex Locks in Tick Loops
 **Learning:** Calling a state-fetching function (`getPosition()`) multiple times within a single tick sequence (`shouldSend`, `buildJson`, `afterSend`) acquires the mutex and copies a 1.5KB struct 3 times per loop, increasing audio-thread contention risk.
 **Action:** Fetch thread-safe state exactly once per loop iteration and pass it by const reference to consumer functions.
+
+## 2024-05-18 - Audio Thread Non-Blocking Telemetry Lock
+**Learning:** A standard `std::lock_guard` used for updating telemetry data in the `processBlock` audio thread creates a risk of priority inversion and audio dropouts if the background WebSocket/telemetry thread holds the lock for reading.
+**Action:** When updating continuous, high-frequency state from an audio thread to a background thread, using `try_lock()` and simply dropping the update if the lock is held is a safe, lock-free alternative because the telemetry consumer operates at a much lower refresh rate than the audio buffer size.
