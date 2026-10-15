@@ -40,5 +40,11 @@ private:
     std::atomic<int> midiEventCount_ { 0 };
     std::atomic<int> activeNoteCount_ { 0 };
 
+    // Cached parameter pointers to avoid audio-thread string lookups
+    std::atomic<float>* modeParam_ = nullptr;
+    std::atomic<float>* rateParam_ = nullptr;
+    std::atomic<float>* beatDivParam_ = nullptr;
+    std::atomic<float>* portParam_ = nullptr;
+
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(WebSocketProcessorBase)
 };
