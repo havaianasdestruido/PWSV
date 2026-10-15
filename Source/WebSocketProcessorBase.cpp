@@ -21,8 +21,16 @@ WebSocketProcessorBase::~WebSocketProcessorBase() {
 }
 
 void WebSocketProcessorBase::prepareToPlay(double sr, int) {
+    // Cache parameter pointers here to ensure APVTS is fully constructed
+    if (!modeParam_) {
+        modeParam_    = apvts_->getRawParameterValue("mode");
+        rateParam_    = apvts_->getRawParameterValue("rate");
+        beatDivParam_ = apvts_->getRawParameterValue("beatDiv");
+        portParam_    = apvts_->getRawParameterValue("port");
+    }
+
     sampleRate_ = sr;
-    int port = static_cast<int>(apvts_->getRawParameterValue("port")->load());
+    int port = static_cast<int>(portParam_->load());
     currentPort_ = port;
     server_->start(port);
 }
@@ -34,15 +42,15 @@ void WebSocketProcessorBase::releaseResources() {
 void WebSocketProcessorBase::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midi) {
     juce::ScopedNoDenormals noDenormals;
 
-    int mode    = static_cast<int>(apvts_->getRawParameterValue("mode")->load());
-    float rate  = apvts_->getRawParameterValue("rate")->load();
-    int beatDiv = static_cast<int>(apvts_->getRawParameterValue("beatDiv")->load());
+    int mode    = static_cast<int>(modeParam_->load());
+    float rate  = rateParam_->load();
+    int beatDiv = static_cast<int>(beatDivParam_->load());
 
     server_->setMode(mode);
     server_->setRate(rate);
     server_->setBeatDivision(beatDiv);
 
-    int port = static_cast<int>(apvts_->getRawParameterValue("port")->load());
+    int port = static_cast<int>(portParam_->load());
     if (port != currentPort_) {
         currentPort_ = port;
         server_->stop();

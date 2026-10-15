@@ -5,6 +5,7 @@
 ## 2024-11-20 - String concatenation overhead in JSON serialization
 **Learning:** `WebSocketServer::buildJson()` was using many `juce::String` concatenations (`+`) which internally allocates and copies memory for every operation. This was happening on the WebSocket send thread periodically. Using a single `juce::String` with `preallocateBytes` and `operator<<` drastically reduces heap allocations and copying overhead.
 **Action:** Identified redundant heap string concatenations, replaced with pre-allocated `juce::String` and `operator<<`.
+
 ## 2024-05-24 - Nagle's Algorithm latency in WebSocket Framing
 **Learning:** Sending the WebSocket header and payload in two separate `send()` calls without `TCP_NODELAY` triggers Nagle's algorithm, causing the payload to be delayed by up to 200ms while waiting for the header's ACK.
 **Action:** Always batch small protocol headers with their payloads into a single `send()` buffer or use `writev` / set `TCP_NODELAY`.
@@ -16,3 +17,7 @@
 ## 2024-05-18 - Audio Thread Non-Blocking Telemetry Lock
 **Learning:** A standard `std::lock_guard` used for updating telemetry data in the `processBlock` audio thread creates a risk of priority inversion and audio dropouts if the background WebSocket/telemetry thread holds the lock for reading.
 **Action:** When updating continuous, high-frequency state from an audio thread to a background thread, using `try_lock()` and simply dropping the update if the lock is held is a safe, lock-free alternative because the telemetry consumer operates at a much lower refresh rate than the audio buffer size.
+
+## 2024-11-20 - String lookup overhead in Audio thread
+**Learning:** `apvts_->getRawParameterValue("...")` performs a string/map lookup and was called continuously inside the `processBlock` real-time audio thread. This can cause severe CPU spikes and audio dropouts because string comparisons and locking map lookups are slow and not real-time safe.
+**Action:** Always cache `std::atomic<float>*` parameter pointers from `juce::AudioProcessorValueTreeState` in `prepareToPlay` (to ensure the APVTS is fully constructed) and only read from the cached atomic pointers inside `processBlock`.
