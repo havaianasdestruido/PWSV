@@ -63,7 +63,9 @@ void WebSocketProcessorBase::processBlock(juce::AudioBuffer<float>& buffer, juce
         int note = msg.getNoteNumber();
         int ch   = msg.getChannel();
         if (msg.isNoteOn()) {
-            activeNotes_.push_back({ note, msg.getVelocity(), ch });
+            if (activeNotes_.size() < PositionData::MAX_NOTES) {
+                activeNotes_.push_back({ note, msg.getVelocity(), ch });
+            }
         } else if (msg.isNoteOff()) {
             for (size_t i = 0; i < activeNotes_.size(); ) {
                 if (activeNotes_[i].note == note && activeNotes_[i].channel == ch) {
