@@ -8,6 +8,7 @@
 #else
   #include <sys/socket.h>
   #include <netinet/in.h>
+  #include <netinet/tcp.h>
   #include <arpa/inet.h>
   #include <unistd.h>
   #include <fcntl.h>
@@ -215,6 +216,10 @@ void WebSocketServer::acceptNewClients() {
         ioctlsocket(csock, FIONBIO, &block);
 #endif
         if (performHandshake(csock)) {
+            // Disable Nagle's Algorithm to prevent ~200ms latency in real-time WebSocket traffic
+            int opt = 1;
+            setsockopt(csock, IPPROTO_TCP, TCP_NODELAY, (const char*)&opt, sizeof(opt));
+
             setNonBlocking(csock);
             clients_.push_back(csock);
             clientCount_.store(static_cast<int>(clients_.size()));
