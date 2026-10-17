@@ -21,3 +21,11 @@
 ## 2024-11-20 - String lookup overhead in Audio thread
 **Learning:** `apvts_->getRawParameterValue("...")` performs a string/map lookup and was called continuously inside the `processBlock` real-time audio thread. This can cause severe CPU spikes and audio dropouts because string comparisons and locking map lookups are slow and not real-time safe.
 **Action:** Always cache `std::atomic<float>*` parameter pointers from `juce::AudioProcessorValueTreeState` in `prepareToPlay` (to ensure the APVTS is fully constructed) and only read from the cached atomic pointers inside `processBlock`.
+
+## 2024-05-24 - Pre-allocating WebSocket buffer
+**Learning:** Re-allocating a vector buffer dynamically for each broadcast on a WebSocket server can create unnecessary allocations, fragmenting the heap and affecting real-time performance.
+**Action:** Replace dynamic local vector with a pre-allocated class member (`std::vector::clear()` and `reserve()`) in methods called heavily, like `WebSocketServer::sendToAll()`.
+
+## 2024-05-24 - Guard real-time data structures
+**Learning:** Hard limits are needed for data structures manipulated in real-time loops like `processBlock`, such as unbounded push_back for MIDI notes which could eventually overflow limits and trigger dynamic allocation.
+**Action:** Always add size guards before pushing into vectors in critical realtime paths.
