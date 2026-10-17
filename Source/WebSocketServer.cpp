@@ -295,23 +295,23 @@ void WebSocketServer::sendToAll(const juce::String& payload) {
     if (clients_.empty()) return;
     auto utf8 = payload.toRawUTF8();
     auto len = static_cast<size_t>(payload.getNumBytesAsUTF8());
-    std::vector<uint8_t> buffer;
-    buffer.reserve(10 + len);
-    buffer.push_back(0x81);
+    sendBuffer_.clear();
+    sendBuffer_.reserve(10 + len);
+    sendBuffer_.push_back(0x81);
     if (len < 126) {
-        buffer.push_back(static_cast<uint8_t>(len));
+        sendBuffer_.push_back(static_cast<uint8_t>(len));
     } else if (len < 65536) {
-        buffer.push_back(126);
-        buffer.push_back(static_cast<uint8_t>((len >> 8) & 0xFF));
-        buffer.push_back(static_cast<uint8_t>(len & 0xFF));
+        sendBuffer_.push_back(126);
+        sendBuffer_.push_back(static_cast<uint8_t>((len >> 8) & 0xFF));
+        sendBuffer_.push_back(static_cast<uint8_t>(len & 0xFF));
     } else {
-        buffer.push_back(127);
+        sendBuffer_.push_back(127);
         for (int i = 7; i >= 0; --i)
-            buffer.push_back(static_cast<uint8_t>((len >> (i * 8)) & 0xFF));
+            sendBuffer_.push_back(static_cast<uint8_t>((len >> (i * 8)) & 0xFF));
     }
-    buffer.insert(buffer.end(), utf8, utf8 + len);
+    sendBuffer_.insert(sendBuffer_.end(), utf8, utf8 + len);
     for (size_t i = clients_.size(); i-- > 0;) {
-        send(clients_[i], (const char*)buffer.data(), static_cast<int>(buffer.size()), 0);
+        send(clients_[i], (const char*)sendBuffer_.data(), static_cast<int>(sendBuffer_.size()), 0);
     }
 }
 

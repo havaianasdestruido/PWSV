@@ -46,6 +46,7 @@ private:
     int listenSocket_ = -1;
     int port_         = 8080;
     std::vector<int> clients_;
+    std::vector<uint8_t> sendBuffer_; // Pre-allocated buffer for sendToAll to avoid per-broadcast allocations
 
     mutable std::mutex posLock_;
     PositionData pos_;
