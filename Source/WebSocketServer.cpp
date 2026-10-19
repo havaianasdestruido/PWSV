@@ -101,6 +101,10 @@ void WebSocketServer::stop() {
 // ── setters (called from any thread) ─────────────────────────
 
 void WebSocketServer::updatePosition(const PositionData& d) {
+    // Fast path: update atomics for the server thread to check without locking
+    currentPpq_.store(d.ppq);
+    isPlaying_.store(d.isPlaying);
+
     // try_lock prevents priority inversion / blocking in the audio thread.
     // If the lock is held by the server thread, we simply skip this update.
     // Since processBlock runs much faster than the websocket send rate,
@@ -187,8 +191,8 @@ void WebSocketServer::run() {
         readFromClients();
 
         if (!clients_.empty()) {
-            PositionData p = getPosition();
-            if (shouldSend(p)) {
+            if (shouldSend()) {
+                PositionData p = getPosition();
                 sendToAll(buildJson(p));
                 afterSend(p);
             }
@@ -317,22 +321,24 @@ void WebSocketServer::sendToAll(const juce::String& payload) {
 
 // ── rate / beat logic ────────────────────────────────────────
 
-bool WebSocketServer::shouldSend(const PositionData& p) {
+bool WebSocketServer::shouldSend() {
     int m = mode_.load();
+    bool playing = isPlaying_.load();
+    double ppq = currentPpq_.load();
 
     if (m == 1) {
-        bool justStarted = p.isPlaying && !wasPlaying_;
-        wasPlaying_ = p.isPlaying;
-        if (!p.isPlaying) return false;
+        bool justStarted = playing && !wasPlaying_;
+        wasPlaying_ = playing;
+        if (!playing) return false;
         if (justStarted) return true;
 
         double div = beatDivisionPpq[beatDiv_.load()];
-        int cur = static_cast<int>(std::floor(p.ppq / div));
+        int cur = static_cast<int>(std::floor(ppq / div));
         int lst = static_cast<int>(std::floor(lastSentPpq_ / div));
         return cur != lst;
     }
 
-    wasPlaying_ = p.isPlaying;
+    wasPlaying_ = playing;
     auto now    = std::chrono::steady_clock::now();
     double elapsed = std::chrono::duration<double>(now - lastSendTime_).count();
     double hz = static_cast<double>(rate_.load());

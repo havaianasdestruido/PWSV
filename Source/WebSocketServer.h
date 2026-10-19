@@ -37,7 +37,7 @@ private:
     void sendToAll(const juce::String& payload);
     void disconnectClient(size_t index);
 
-    bool shouldSend(const PositionData& p);
+    bool shouldSend();
     void afterSend(const PositionData& p);
     juce::String buildJson(const PositionData& p);
 
@@ -59,6 +59,9 @@ private:
     std::atomic<int>  clientCount_ { 0 };
     std::atomic<bool> running_     { false };
     juce::String lastError_;
+
+    std::atomic<double> currentPpq_ { 0.0 };
+    std::atomic<bool>   isPlaying_  { false };
 
     double lastSentPpq_ = -1.0;
     bool   wasPlaying_  = false;

@@ -29,3 +29,7 @@
 ## 2024-05-24 - Guard real-time data structures
 **Learning:** Hard limits are needed for data structures manipulated in real-time loops like `processBlock`, such as unbounded push_back for MIDI notes which could eventually overflow limits and trigger dynamic allocation.
 **Action:** Always add size guards before pushing into vectors in critical realtime paths.
+
+## 2024-06-25 - Avoid Mutex Lock Contention in Real-Time Threads
+**Learning:** Polling loops in background threads (like the WebSocket server) that repeatedly check a condition by locking a shared mutex can cause severe lock contention, increasing the chance of `try_lock()` failures in the real-time audio thread, leading to dropped frames or state updates.
+**Action:** Extract frequently checked state variables (like `ppq` and `isPlaying`) into `std::atomic` variables. Update these lock-free atomics unconditionally on the real-time thread, and use them on the polling thread to decide if the heavier payload structure actually needs to be locked and sent.
