@@ -29,3 +29,7 @@
 ## 2024-05-24 - Guard real-time data structures
 **Learning:** Hard limits are needed for data structures manipulated in real-time loops like `processBlock`, such as unbounded push_back for MIDI notes which could eventually overflow limits and trigger dynamic allocation.
 **Action:** Always add size guards before pushing into vectors in critical realtime paths.
+
+## 2024-11-20 - Redundant recv() syscalls in WebSocket event loop
+**Learning:** The WebSocketServer event loop was blindly calling `recv()` on every connected client inside the `readFromClients()` loop, regardless of whether `select()` indicated the socket had pending data. Since `recv()` is a system call, this caused thousands of unnecessary context switches per second when clients were idle.
+**Action:** Always pass the `fd_set` populated by `select()` to reading functions and check `FD_ISSET()` before calling `recv()`, avoiding redundant system calls.
