@@ -46,5 +46,10 @@ private:
     std::atomic<float>* beatDivParam_ = nullptr;
     std::atomic<float>* portParam_ = nullptr;
 
+    int currentMode_ = -1;
+    float currentRate_ = -1.0f;
+    int currentBeatDiv_ = -1;
+    double currentBpm_ = -1.0;
+
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(WebSocketProcessorBase)
 };

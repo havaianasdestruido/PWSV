@@ -46,9 +46,18 @@ void WebSocketProcessorBase::processBlock(juce::AudioBuffer<float>& buffer, juce
     float rate  = rateParam_->load();
     int beatDiv = static_cast<int>(beatDivParam_->load());
 
-    server_->setMode(mode);
-    server_->setRate(rate);
-    server_->setBeatDivision(beatDiv);
+    if (mode != currentMode_) {
+        currentMode_ = mode;
+        server_->setMode(mode);
+    }
+    if (rate != currentRate_) {
+        currentRate_ = rate;
+        server_->setRate(rate);
+    }
+    if (beatDiv != currentBeatDiv_) {
+        currentBeatDiv_ = beatDiv;
+        server_->setBeatDivision(beatDiv);
+    }
 
     int port = static_cast<int>(portParam_->load());
     if (port != currentPort_) {
@@ -114,7 +123,10 @@ void WebSocketProcessorBase::processBlock(juce::AudioBuffer<float>& buffer, juce
             }
 
             server_->updatePosition(pd);
-            server_->setBpm(pd.bpm);
+            if (pd.bpm != currentBpm_) {
+                currentBpm_ = pd.bpm;
+                server_->setBpm(pd.bpm);
+            }
         }
     }
 
