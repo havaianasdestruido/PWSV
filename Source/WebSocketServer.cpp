@@ -103,7 +103,7 @@ void WebSocketServer::stop() {
 void WebSocketServer::updatePosition(const PositionData& d) {
     // Fast path: update atomics for the server thread to check without locking
     currentPpq_.store(d.ppq);
-    isPlaying_.store(d.isPlaying);
+    if (isPlaying_.load(std::memory_order_relaxed) != d.isPlaying) isPlaying_.store(d.isPlaying);
 
     // try_lock prevents priority inversion / blocking in the audio thread.
     // If the lock is held by the server thread, we simply skip this update.
@@ -115,10 +115,10 @@ void WebSocketServer::updatePosition(const PositionData& d) {
     }
 }
 
-void WebSocketServer::setMode(int m)           { mode_.store(m); }
-void WebSocketServer::setRate(float hz)        { rate_.store(hz); }
-void WebSocketServer::setBeatDivision(int idx) { beatDiv_.store(idx); }
-void WebSocketServer::setBpm(double b)         { bpm_.store(b); }
+void WebSocketServer::setMode(int m)           { if (mode_.load(std::memory_order_relaxed) != m) mode_.store(m); }
+void WebSocketServer::setRate(float hz)        { if (rate_.load(std::memory_order_relaxed) != hz) rate_.store(hz); }
+void WebSocketServer::setBeatDivision(int idx) { if (beatDiv_.load(std::memory_order_relaxed) != idx) beatDiv_.store(idx); }
+void WebSocketServer::setBpm(double b)         { if (bpm_.load(std::memory_order_relaxed) != b) bpm_.store(b); }
 
 int  WebSocketServer::getConnectedClientCount() const { return clientCount_.load(); }
 bool WebSocketServer::isRunning()              const { return running_.load(); }

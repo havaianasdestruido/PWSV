@@ -79,7 +79,10 @@ void WebSocketProcessorBase::processBlock(juce::AudioBuffer<float>& buffer, juce
         }
     }
 
-    activeNoteCount_.store(static_cast<int>(activeNotes_.size()));
+    int currentActiveNotes = static_cast<int>(activeNotes_.size());
+    if (activeNoteCount_.load(std::memory_order_relaxed) != currentActiveNotes) {
+        activeNoteCount_.store(currentActiveNotes);
+    }
 
     auto playHead = getPlayHead();
     if (playHead) {

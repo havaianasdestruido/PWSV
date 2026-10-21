@@ -33,3 +33,7 @@
 ## 2024-06-25 - Avoid Mutex Lock Contention in Real-Time Threads
 **Learning:** Polling loops in background threads (like the WebSocket server) that repeatedly check a condition by locking a shared mutex can cause severe lock contention, increasing the chance of `try_lock()` failures in the real-time audio thread, leading to dropped frames or state updates.
 **Action:** Extract frequently checked state variables (like `ppq` and `isPlaying`) into `std::atomic` variables. Update these lock-free atomics unconditionally on the real-time thread, and use them on the polling thread to decide if the heavier payload structure actually needs to be locked and sent.
+
+## 2024-11-20 - Unconditional atomic store overhead in Audio thread
+**Learning:** Unconditional atomic stores (`store()`) invalidate cache lines for other cores, leading to "cache line bouncing" and performance degradation, even when the value hasn't changed. This is especially true for rarely changing values (like UI parameters or boolean states) in high-frequency real-time contexts like `processBlock`.
+**Action:** Wrap `std::atomic::store()` with a `load(std::memory_order_relaxed)` check if the value rarely changes. This prevents measurable overhead from unconditional memory synchronization barriers.
