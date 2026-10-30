@@ -42,9 +42,11 @@ void WebSocketProcessorBase::releaseResources() {
 void WebSocketProcessorBase::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midi) {
     juce::ScopedNoDenormals noDenormals;
 
-    int mode    = static_cast<int>(modeParam_->load());
-    float rate  = rateParam_->load();
-    int beatDiv = static_cast<int>(beatDivParam_->load());
+    // Optimization: Use relaxed memory order for high-frequency parameter loads in the audio thread
+    // to avoid default seq_cst memory synchronization barriers which add unnecessary CPU overhead.
+    int mode    = static_cast<int>(modeParam_->load(std::memory_order_relaxed));
+    float rate  = rateParam_->load(std::memory_order_relaxed);
+    int beatDiv = static_cast<int>(beatDivParam_->load(std::memory_order_relaxed));
 
     if (mode != currentMode_) {
         currentMode_ = mode;
@@ -59,7 +61,7 @@ void WebSocketProcessorBase::processBlock(juce::AudioBuffer<float>& buffer, juce
         server_->setBeatDivision(beatDiv);
     }
 
-    int port = static_cast<int>(portParam_->load());
+    int port = static_cast<int>(portParam_->load(std::memory_order_relaxed));
     if (port != currentPort_) {
         currentPort_ = port;
         server_->stop();
@@ -68,7 +70,8 @@ void WebSocketProcessorBase::processBlock(juce::AudioBuffer<float>& buffer, juce
 
     for (const auto metadata : midi) {
         auto msg = metadata.getMessage();
-        midiEventCount_.fetch_add(1);
+        // Optimization: Use relaxed memory order to avoid seq_cst overhead on high-frequency MIDI events.
+        midiEventCount_.fetch_add(1, std::memory_order_relaxed);
         int note = msg.getNoteNumber();
         int ch   = msg.getChannel();
         if (msg.isNoteOn()) {
@@ -88,7 +91,12 @@ void WebSocketProcessorBase::processBlock(juce::AudioBuffer<float>& buffer, juce
         }
     }
 
-    activeNoteCount_.store(static_cast<int>(activeNotes_.size()));
+    // Optimization: Prevent measurable overhead and cache line bouncing by checking load
+    // before unconditional store, and using relaxed memory order.
+    int currentNotes = static_cast<int>(activeNotes_.size());
+    if (activeNoteCount_.load(std::memory_order_relaxed) != currentNotes) {
+        activeNoteCount_.store(currentNotes, std::memory_order_relaxed);
+    }
 
     auto playHead = getPlayHead();
     if (playHead) {
