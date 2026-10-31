@@ -32,7 +32,7 @@ private:
     void run() override;
 
     void acceptNewClients();
-    void readFromClients();
+    void readFromClients(fd_set& readSet);
     bool performHandshake(int sock);
     void sendToAll(const juce::String& payload);
     void disconnectClient(size_t index);
