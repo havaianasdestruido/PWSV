@@ -37,3 +37,6 @@
 ## 2024-11-20 - Redundant Atomic Stores in High-Frequency Audio Callbacks
 **Learning:** Calling `std::atomic::store()` unconditionally inside a high-frequency loop (like `processBlock` invoking `updatePosition`) enforces memory synchronization barriers (even with sequential consistency default) which adds measurable overhead. Checking `load(std::memory_order_relaxed)` first and conditionally storing can be more than 15x faster when values rarely change.
 **Action:** Always wrap `std::atomic::store` with a relaxed load check in high-frequency, real-time contexts if the value is mostly stable (e.g., parameter updates, playhead states).
+## 2024-05-30 - select() call fd_set loop bug
+**Learning:** Inside a `select()` loop, checking client sockets for readability was incorrectly looping over all clients without first checking if the socket was flagged in `readSet` using `FD_ISSET`. This results in calling `recv()` on non-ready, non-blocking sockets in an aggressive busy loop, causing high CPU load. Also, `readFromClients` was called without passing `readSet` which wasn't even compiling anyway with the error.
+**Action:** Fixed it.
