@@ -98,42 +98,44 @@ void WebSocketProcessorBase::processBlock(juce::AudioBuffer<float>& buffer, juce
         activeNoteCount_.store(currentNotes, std::memory_order_relaxed);
     }
 
-    auto playHead = getPlayHead();
-    if (playHead) {
-        auto info = playHead->getPosition();
-        if (info) {
-            PositionData pd;
-            pd.timeInSeconds = info->getTimeInSeconds().orFallback(0.0);
-            pd.timeInSamples = info->getTimeInSamples().orFallback(0);
-            pd.ppq           = info->getPpqPosition().orFallback(0.0);
-            pd.bpm           = info->getBpm().orFallback(120.0);
-            pd.isPlaying     = info->getIsPlaying();
-            pd.isRecording   = info->getIsRecording();
-            pd.isLooping     = info->getIsLooping();
+    if (server_->getConnectedClientCount() > 0) {
+        auto playHead = getPlayHead();
+        if (playHead) {
+            auto info = playHead->getPosition();
+            if (info) {
+                PositionData pd;
+                pd.timeInSeconds = info->getTimeInSeconds().orFallback(0.0);
+                pd.timeInSamples = info->getTimeInSamples().orFallback(0);
+                pd.ppq           = info->getPpqPosition().orFallback(0.0);
+                pd.bpm           = info->getBpm().orFallback(120.0);
+                pd.isPlaying     = info->getIsPlaying();
+                pd.isRecording   = info->getIsRecording();
+                pd.isLooping     = info->getIsLooping();
 
-            auto ts = info->getTimeSignature();
-            if (ts) { pd.timeSigNum = ts->numerator; pd.timeSigDen = ts->denominator; }
+                auto ts = info->getTimeSignature();
+                if (ts) { pd.timeSigNum = ts->numerator; pd.timeSigDen = ts->denominator; }
 
-            auto barStart = info->getPpqPositionOfLastBarStart();
-            if (barStart && pd.timeSigNum > 0 && pd.ppq >= *barStart) {
-                double barLengthPpq = (pd.timeSigDen > 0)
-                    ? (static_cast<double>(pd.timeSigNum) * 4.0 / pd.timeSigDen)
-                    : 4.0;
-                pd.barNumber = static_cast<int>(*barStart / barLengthPpq) + 1;
-                pd.beatInBar = pd.ppq - *barStart;
-            }
+                auto barStart = info->getPpqPositionOfLastBarStart();
+                if (barStart && pd.timeSigNum > 0 && pd.ppq >= *barStart) {
+                    double barLengthPpq = (pd.timeSigDen > 0)
+                        ? (static_cast<double>(pd.timeSigNum) * 4.0 / pd.timeSigDen)
+                        : 4.0;
+                    pd.barNumber = static_cast<int>(*barStart / barLengthPpq) + 1;
+                    pd.beatInBar = pd.ppq - *barStart;
+                }
 
-            pd.activeNoteCount = static_cast<int>(activeNotes_.size());
-            for (int i = 0; i < pd.activeNoteCount && i < PositionData::MAX_NOTES; ++i) {
-                pd.activeNoteNumbers[i]  = activeNotes_[i].note;
-                pd.activeNoteVelocities[i] = activeNotes_[i].velocity;
-                pd.activeNoteChannels[i] = activeNotes_[i].channel;
-            }
+                pd.activeNoteCount = static_cast<int>(activeNotes_.size());
+                for (int i = 0; i < pd.activeNoteCount && i < PositionData::MAX_NOTES; ++i) {
+                    pd.activeNoteNumbers[i]  = activeNotes_[i].note;
+                    pd.activeNoteVelocities[i] = activeNotes_[i].velocity;
+                    pd.activeNoteChannels[i] = activeNotes_[i].channel;
+                }
 
-            server_->updatePosition(pd);
-            if (pd.bpm != currentBpm_) {
-                currentBpm_ = pd.bpm;
-                server_->setBpm(pd.bpm);
+                server_->updatePosition(pd);
+                if (pd.bpm != currentBpm_) {
+                    currentBpm_ = pd.bpm;
+                    server_->setBpm(pd.bpm);
+                }
             }
         }
     }
