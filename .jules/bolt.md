@@ -40,3 +40,7 @@
 ## 2024-05-30 - select() call fd_set loop bug
 **Learning:** Inside a `select()` loop, checking client sockets for readability was incorrectly looping over all clients without first checking if the socket was flagged in `readSet` using `FD_ISSET`. This results in calling `recv()` on non-ready, non-blocking sockets in an aggressive busy loop, causing high CPU load. Also, `readFromClients` was called without passing `readSet` which wasn't even compiling anyway with the error.
 **Action:** Fixed it.
+
+## 2024-11-20 - Skip Telemetry Overhead When No Clients Connected
+**Learning:** The audio thread (`processBlock`) was unconditionally querying the host for playhead info, allocating and copying a `PositionData` struct, and passing it to the server thread every single block, even when no WebSocket clients were connected.
+**Action:** Wrapped the telemetry processing block in an `if (server_->getConnectedClientCount() > 0)` check, and optimized `getConnectedClientCount()` to use `std::memory_order_relaxed`.

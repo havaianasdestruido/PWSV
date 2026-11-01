@@ -134,7 +134,7 @@ void WebSocketServer::setBpm(double b) {
         bpm_.store(b, std::memory_order_relaxed);
 }
 
-int  WebSocketServer::getConnectedClientCount() const { return clientCount_.load(); }
+int  WebSocketServer::getConnectedClientCount() const { return clientCount_.load(std::memory_order_relaxed); }
 bool WebSocketServer::isRunning()              const { return running_.load(); }
 juce::String WebSocketServer::getLastError()   const { return lastError_; }
 
