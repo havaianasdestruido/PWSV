@@ -155,12 +155,14 @@ void PluginEditor::timerCallback() {
     auto* server = proc_.getServer();
     if (server && server->isRunning()) {
         int n = server->getConnectedClientCount();
-        statusLabel_.setText("Server running on port " +
-            juce::String(static_cast<int>(portSlider_.getValue())) +
-            " - " + juce::String(n) + " client" + (n == 1 ? "" : "s") +
-            " | MIDI: " + juce::String(proc_.getMidiEventCount()) +
-            " | Active: " + juce::String(proc_.getActiveNoteCount()),
-            juce::dontSendNotification);
+        juce::String status;
+        status.preallocateBytes(128);
+        status << "Server running on port "
+               << static_cast<int>(portSlider_.getValue())
+               << " - " << n << " client" << (n == 1 ? "" : "s")
+               << " | MIDI: " << proc_.getMidiEventCount()
+               << " | Active: " << proc_.getActiveNoteCount();
+        statusLabel_.setText(status, juce::dontSendNotification);
         statusLabel_.setColour(juce::Label::textColourId, juce::Colours::green);
     } else {
         statusLabel_.setText("Server stopped", juce::dontSendNotification);

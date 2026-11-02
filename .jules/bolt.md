@@ -44,3 +44,7 @@
 ## 2024-11-20 - Skip Telemetry Overhead When No Clients Connected
 **Learning:** The audio thread (`processBlock`) was unconditionally querying the host for playhead info, allocating and copying a `PositionData` struct, and passing it to the server thread every single block, even when no WebSocket clients were connected.
 **Action:** Wrapped the telemetry processing block in an `if (server_->getConnectedClientCount() > 0)` check, and optimized `getConnectedClientCount()` to use `std::memory_order_relaxed`.
+
+## 2024-11-20 - Unnecessary temporary heap allocations during String concatenation
+**Learning:** Using the `+` operator for `juce::String` concatenation or explicitly calling `juce::String(primitive)` wrapped around primitive types (like integers) prior to `operator<<` appends creates temporary `juce::String` objects. In JUCE, which lacks Small String Optimization (SSO), this causes unnecessary dynamic memory allocations on the heap, which is especially detrimental in frequently called functions like timer callbacks or network payload builders.
+**Action:** Always pre-allocate the required memory using `juce::String::preallocateBytes()` and use `operator<<` directly with primitive types (e.g., `str << intValue`) to avoid temporary allocations.
