@@ -382,12 +382,12 @@ juce::String WebSocketServer::buildJson(const PositionData& p) {
     json << "{"
          << "\"protocol\":2,"
          << "\"time_sec\":"    << dbl(p.timeInSeconds)   << ","
-         << "\"time_samples\":" << juce::String(p.timeInSamples) << ","
+         << "\"time_samples\":" << p.timeInSamples       << ","
          << "\"ppq\":"         << dbl(p.ppq)             << ","
          << "\"bpm\":"         << dbl(p.bpm, 1)          << ","
-         << "\"bar\":"         << juce::String(p.barNumber) << ","
+         << "\"bar\":"         << p.barNumber            << ","
          << "\"beat\":"        << dbl(p.beatInBar, 2)    << ","
-         << "\"time_sig\":["   << juce::String(p.timeSigNum) << "," << juce::String(p.timeSigDen) << "],"
+         << "\"time_sig\":["   << p.timeSigNum           << "," << p.timeSigDen << "],"
          << "\"playing\":"     << (p.isPlaying   ? "true" : "false") << ","
          << "\"recording\":"   << (p.isRecording ? "true" : "false") << ","
          << "\"looping\":"     << (p.isLooping   ? "true" : "false") << ","
@@ -396,9 +396,9 @@ juce::String WebSocketServer::buildJson(const PositionData& p) {
     for (int i = 0; i < p.activeNoteCount; ++i) {
         if (i > 0) json << ",";
         json << "{"
-             << "\"note\":" << juce::String(p.activeNoteNumbers[i]) << ","
-             << "\"vel\":" << juce::String(p.activeNoteVelocities[i]) << ","
-             << "\"ch\":" << juce::String(p.activeNoteChannels[i] + 1)
+             << "\"note\":" << p.activeNoteNumbers[i]   << ","
+             << "\"vel\":"  << p.activeNoteVelocities[i] << ","
+             << "\"ch\":"   << (p.activeNoteChannels[i] + 1)
              << "}";
     }
     json << "]}";
