@@ -27,19 +27,74 @@ PWSV uses **CMake 3.22+** with modern `FetchContent` to download and configure *
 
 ## Build Steps
 
+The quickest path is the cross-platform helper, which configures, builds and
+packages the plugins for the current OS:
+
 ```bash
-# 1. Clone the repository
 git clone https://github.com/havaianasdestruido/PWSV.git
 cd PWSV
 
-# 2. Configure build directory
-cmake -B build -DCMAKE_BUILD_TYPE=Release
-
-# 3. Compile targets
-cmake --build build --config Release -j
+python3 scripts/build.py            # Windows: py -3 scripts\build.py
 ```
 
+Artefacts end up in `build/<target>_artefacts/Release/` and the release
+archives in `dist/`.
+
+Or drive CMake yourself:
+
+```bash
+# 1. Configure build directory
+cmake -B build -DCMAKE_BUILD_TYPE=Release
+
+# 2. Compile targets
+cmake --build build --config Release -j
+
+# 3. Package the artefacts (optional)
+python3 scripts/package.py --platform linux --build-dir build --config Release
+```
+
+### Per-target builds
+
+```bash
+# CMake targets created by juce_add_plugin
+cmake --build build --target PatoWebSocketEffect_VST3    --config Release
+cmake --build build --target PatoWebSocketEffect_CLAP    --config Release
+cmake --build build --target PatoWebSocketGenerator_Standalone --config Release
+```
+
+### Output layout
+
+| Path | Contents |
+|---|---|
+| `build/<target>_artefacts/Release/VST3/` | `<Product>.vst3` (bundle/folder) |
+| `build/<target>_artefacts/Release/CLAP/` | `<Product>.clap` (bundle on macOS) |
+| `build/<target>_artefacts/Release/Standalone/` | `<Product>`, `<Product>.exe` or `<Product>.app` |
+| `dist/PWSV-<version>-<platform>-<arch>/` | staged package with `README.txt` |
+| `dist/PWSV-<version>-<platform>-<arch>.(zip\|tar.gz)` | release archive + `.sha256` |
+
+:::tip Universal macOS builds
+Pass `-DCMAKE_OSX_ARCHITECTURES="x86_64;arm64"` (or set
+`PWSV_ARCHITECTURES` when using `scripts/build.py`) to ship a single binary for
+Intel and Apple Silicon.
+:::
+
 ---
+
+## Build Helper Options
+
+`scripts/build.py` wraps the commands above:
+
+| Flag | Effect |
+|---|---|
+| `--config Debug\|Release\|RelWithDebInfo` | Build configuration (default `Release`) |
+| `--clean` | Delete `build/` before configuring |
+| `--target NAME` | Build a single CMake target (repeatable) |
+| `--configure-only` | Configure without compiling |
+| `--no-pack` | Skip the packaging step |
+| `--pack` | Only package artifacts that are already built |
+| `--arch TAG` | Architecture tag used in the archive name |
+| `PWSV_GENERATOR` | Force a CMake generator (e.g. `Ninja`) |
+| `PWSV_ARCHITECTURES` | macOS universal build, e.g. `"x86_64;arm64"` |
 
 ## CMake Configuration Breakdown
 
