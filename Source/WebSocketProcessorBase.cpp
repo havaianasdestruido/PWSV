@@ -68,10 +68,14 @@ void WebSocketProcessorBase::processBlock(juce::AudioBuffer<float>& buffer, juce
         server_->start(port);
     }
 
+    int numEvents = midi.getNumEvents();
+    if (numEvents > 0) {
+        // Optimization: Batch atomic operations outside the loop to avoid N-1 atomic operations per block
+        midiEventCount_.fetch_add(numEvents, std::memory_order_relaxed);
+    }
+
     for (const auto metadata : midi) {
         auto msg = metadata.getMessage();
-        // Optimization: Use relaxed memory order to avoid seq_cst overhead on high-frequency MIDI events.
-        midiEventCount_.fetch_add(1, std::memory_order_relaxed);
         int note = msg.getNoteNumber();
         int ch   = msg.getChannel();
         if (msg.isNoteOn()) {

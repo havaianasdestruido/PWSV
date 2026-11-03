@@ -48,3 +48,7 @@
 ## 2024-11-20 - Unnecessary temporary heap allocations during String concatenation
 **Learning:** Using the `+` operator for `juce::String` concatenation or explicitly calling `juce::String(primitive)` wrapped around primitive types (like integers) prior to `operator<<` appends creates temporary `juce::String` objects. In JUCE, which lacks Small String Optimization (SSO), this causes unnecessary dynamic memory allocations on the heap, which is especially detrimental in frequently called functions like timer callbacks or network payload builders.
 **Action:** Always pre-allocate the required memory using `juce::String::preallocateBytes()` and use `operator<<` directly with primitive types (e.g., `str << intValue`) to avoid temporary allocations.
+
+## 2024-11-20 - Batch atomic increments in high-frequency real-time loops
+**Learning:** Incrementing an atomic variable inside a high-frequency loop over multiple events (like `processBlock` looping through multiple MIDI events) executes multiple atomic fetch-and-add operations, leading to unnecessary overhead and bus locks on the real-time thread. Batching these atomic updates into a single operation before the loop eliminates the `N-1` atomic synchronization overheads.
+**Action:** Always batch atomic updates into a single add outside of tight real-time processing loops when possible.
