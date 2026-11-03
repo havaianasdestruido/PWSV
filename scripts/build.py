@@ -194,7 +194,14 @@ def read_version() -> str:
 
     text = (REPO_ROOT / "CMakeLists.txt").read_text(encoding="utf-8")
     match = re.search(r"project\s*\([^)]*?VERSION\s+([0-9][0-9.]*)", text, re.DOTALL)
-    return match.group(1) if match else "0.0.0-dev"
+    if match:
+        return match.group(1).rstrip(".")
+
+    # Never hand a non-numeric version to CMake: `project(... VERSION 0.0.0-dev)`
+    # is a hard configure error.
+    log("warning: could not read project(... VERSION ...) from CMakeLists.txt; "
+        "falling back to 0.0.0")
+    return "0.0.0"
 
 
 if __name__ == "__main__":

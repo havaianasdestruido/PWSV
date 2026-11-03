@@ -1,10 +1,15 @@
 cmake_minimum_required(VERSION 3.22)
 
-# PWSV_VERSION lets the build scripts / CI stamp the release version into the
-# plugin bundles (Info.plist, VST3 version) without editing this file.
-set(PWSV_VERSION "1.1.0" CACHE STRING "PWSV release version")
+# Keep the literal version on the project() line: scripts/build.py reads it back
+# with a regex, and CI keys its dependency cache on this file.
+project(PatoWebSocketVST VERSION 1.1.0 LANGUAGES C CXX)
 
-project(PatoWebSocketVST VERSION ${PWSV_VERSION} LANGUAGES C CXX)
+# Optional override so a tag / manual run can stamp its version into the plugin
+# bundles (VST3 version, Info.plist) without editing this file. Plain CMake
+# builds keep the project() version above. Must stay numeric (x.y.z) because
+# CMake rejects anything else.
+set(PWSV_VERSION "${PROJECT_VERSION}" CACHE STRING
+    "PWSV version stamped into the plugin bundles (default: project VERSION)")
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -62,6 +67,8 @@ target_sources(PatoWebSocketEffect PRIVATE
     ${COMMON_SOURCES}
 )
 
+# VERSION drives the VST3/CLAP version metadata and the Windows .rc version
+# resource, so a tagged CI build reports the tag it was built from.
 target_compile_definitions(PatoWebSocketEffect
     PUBLIC
         JUCE_WEB_BROWSER=0
@@ -82,6 +89,8 @@ target_link_libraries(PatoWebSocketEffect
 if(WIN32)
     target_link_libraries(PatoWebSocketEffect PRIVATE ws2_32)
 endif()
+
+set_target_properties(PatoWebSocketEffect PROPERTIES VERSION "${PWSV_VERSION}")
 
 clap_juce_extensions_plugin(TARGET PatoWebSocketEffect
     CLAP_ID "com.pato.websocket-effect"
@@ -109,6 +118,8 @@ target_sources(PatoWebSocketGenerator PRIVATE
     ${COMMON_SOURCES}
 )
 
+# VERSION drives the VST3/CLAP version metadata and the Windows .rc version
+# resource, so a tagged CI build reports the tag it was built from.
 target_compile_definitions(PatoWebSocketGenerator
     PUBLIC
         JUCE_WEB_BROWSER=0
@@ -129,6 +140,8 @@ target_link_libraries(PatoWebSocketGenerator
 if(WIN32)
     target_link_libraries(PatoWebSocketGenerator PRIVATE ws2_32)
 endif()
+
+set_target_properties(PatoWebSocketGenerator PROPERTIES VERSION "${PWSV_VERSION}")
 
 clap_juce_extensions_plugin(TARGET PatoWebSocketGenerator
     CLAP_ID "com.pato.websocket-generator"
