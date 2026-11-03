@@ -112,6 +112,30 @@ cmake -B build -DCMAKE_BUILD_TYPE=Release
 cmake --build build --config Release -j
 ```
 
+Binaries land in `build/<Target>_artefacts/Release/{VST3,CLAP,Standalone}/`.
+
+### Prebuilt packages (CI)
+
+[`.github/workflows/build.yml`](.github/workflows/build.yml) builds all three platforms on
+every push and pull request:
+
+| Platform | Runner | Architectures | Package |
+|---|---|---|---|
+| Windows | `windows-2022` (MSVC) | x64 | `PWSV-<ver>-windows-x64.zip` (`setup.bat` installer included) |
+| macOS | `macos-15` (arm64 host) | **universal** `x86_64 + arm64` | `PWSV-<ver>-macos-universal.zip` |
+| Linux | `ubuntu-22.04` (glibc 2.35) | x86_64 | `PWSV-<ver>-linux-x86_64.tar.gz` |
+
+Grab them from the run's **Artifacts** section (`gh run download --name PWSV-linux-x86_64`),
+or push a tag to get a draft GitHub Release:
+
+```bash
+git tag v1.1.0
+git push origin v1.1.0
+```
+
+macOS/Linux packages ship [`packaging/install.sh`](packaging/install.sh)
+(`./install.sh [--system] [--dry-run]`) which mirrors the Windows `setup.bat`.
+
 ---
 
 ## 📄 License

@@ -39,6 +39,14 @@ cmake -B build -DCMAKE_BUILD_TYPE=Release
 cmake --build build --config Release -j
 ```
 
+Binaries are written to `build/<Target>_artefacts/Release/{VST3,CLAP,Standalone}/`.
+
+:::tip Prebuilt packages
+The [`Build` workflow](./ci-cd.md) compiles Windows x64, macOS universal
+(`x86_64 + arm64`) and Linux x86_64 packages on every push; pushing a `v*` tag drafts a
+GitHub Release with all three attached.
+:::
+
 ---
 
 ## CMake Configuration Breakdown

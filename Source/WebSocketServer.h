@@ -6,6 +6,16 @@
 #include <atomic>
 #include <chrono>
 
+// fd_set is declared by the sockets headers, which this header does not pull in
+// (juce_core only guarantees >= winsock.h on Windows). Forward-declare the types
+// used in the private signatures so the header stays self-contained and cheap to
+// include; WebSocketServer.cpp includes the real platform headers first.
+#if defined(_WIN32)
+struct fd_set;
+#else
+#include <sys/select.h>
+#endif
+
 class WebSocketServer : public juce::Thread {
 public:
     WebSocketServer();

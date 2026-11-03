@@ -1,0 +1,387 @@
+name: Build
+
+# ── PWSV build pipeline ───────────────────────────────────────────────────────
+# Builds both plugins (PatoWebSocketEffect + PatoWebSocketGenerator) in every
+# supported format (VST3, CLAP, Standalone) on Windows, macOS and Linux.
+#
+#   push to main / arena/**            → build + upload artifacts
+#   pull request                       → build + upload artifacts (validation)
+#   push tag v*                        → build + draft GitHub Release
+#   manual run with a version          → build + draft GitHub Release
+#
+# Artifacts live for 14 days. Releases are created as drafts so they can be
+# reviewed before they are published.
+# ─────────────────────────────────────────────────────────────────────────────
+
+on:
+  push:
+    branches:
+      - main
+      - "arena/**"
+    tags:
+      - "v*"
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version for the release (e.g. 1.1.0). Empty = read from CMakeLists.txt and do not release."
+        required: false
+        default: ""
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  BUILD_TYPE: Release
+
+jobs:
+  # ── Resolve the version string used for packages / releases ────────────────
+  meta:
+    name: Resolve version
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.value }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+
+      - name: Resolve version
+        id: version
+        shell: bash
+        # Input/tag values are passed through env instead of inline interpolation
+        env:
+          INPUT_VERSION: ${{ inputs.version }}
+        run: |
+          set -euo pipefail
+          version="${INPUT_VERSION:-}"
+          if [ -z "$version" ] && [[ "${GITHUB_REF}" == refs/tags/v* ]]; then
+            version="${GITHUB_REF_NAME#v}"
+          fi
+          if [ -z "$version" ]; then
+            version="$(sed -n 's/^project(.*VERSION \([0-9][0-9.]*\).*/\1/p' CMakeLists.txt | head -n1)"
+          fi
+          if [ -z "$version" ]; then
+            version="0.0.0"
+          fi
+          echo "Resolved version: ${version}"
+          echo "value=${version}" >> "$GITHUB_OUTPUT"
+
+  # ── Windows x64 (MSVC / Visual Studio 2022) ────────────────────────────────
+  windows:
+    name: Windows x64
+    needs: meta
+    runs-on: windows-2022
+    defaults:
+      run:
+        shell: pwsh
+    env:
+      BUILD_DIR: build
+      STAGE_DIR: out/windows-x64
+      VERSION: ${{ needs.meta.outputs.version }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+
+      - name: Show toolchain versions
+        run: |
+          cmake --version
+          git --version
+
+      - name: Configure
+        run: |
+          cmake -S . -B $env:BUILD_DIR `
+            -G "Visual Studio 17 2022" -A x64 `
+            -DCMAKE_BUILD_TYPE=$env:BUILD_TYPE
+
+      - name: Build
+        run: cmake --build $env:BUILD_DIR --config $env:BUILD_TYPE --parallel
+
+      # JUCE emits <build>/<Target>_artefacts/<Config>/<Format>/<Product>.<ext>
+      - name: Stage binaries
+        run: |
+          $ErrorActionPreference = "Stop"
+
+          $targets = @("PatoWebSocketEffect", "PatoWebSocketGenerator")
+          $copied = @()
+
+          foreach ($t in $targets) {
+            $formatDir = Join-Path $env:BUILD_DIR "$($t)_artefacts/$env:BUILD_TYPE"
+            if (-not (Test-Path $formatDir)) { throw "Missing artefact folder: $formatDir" }
+
+            # VST3 bundles (directory trees)
+            $vst3 = Join-Path $formatDir "VST3"
+            if (Test-Path $vst3) {
+              foreach ($bundle in Get-ChildItem -Path $vst3 -Directory) {
+                $dest = Join-Path $env:STAGE_DIR "VST3/$($bundle.Name)"
+                New-Item -ItemType Directory -Force -Path $dest | Out-Null
+                Copy-Item -Path (Join-Path $bundle.FullName "*") -Destination $dest -Recurse -Force
+                $copied += "VST3/$($bundle.Name)"
+              }
+            }
+
+            # CLAP binaries
+            $clap = Join-Path $formatDir "CLAP"
+            if (Test-Path $clap) {
+              $dest = Join-Path $env:STAGE_DIR "CLAP"
+              New-Item -ItemType Directory -Force -Path $dest | Out-Null
+              foreach ($file in Get-ChildItem -Path $clap -Filter *.clap -File) {
+                Copy-Item $file.FullName $dest -Force
+                $copied += "CLAP/$($file.Name)"
+              }
+            }
+
+            # Standalone applications
+            $standalone = Join-Path $formatDir "Standalone"
+            if (Test-Path $standalone) {
+              $dest = Join-Path $env:STAGE_DIR "Standalone"
+              New-Item -ItemType Directory -Force -Path $dest | Out-Null
+              foreach ($file in Get-ChildItem -Path $standalone -Filter *.exe -File) {
+                Copy-Item $file.FullName $dest -Force
+                $copied += "Standalone/$($file.Name)"
+              }
+            }
+          }
+
+          if ($copied.Count -eq 0) {
+            throw "No plugin binaries were produced - check the build log."
+          }
+
+          # Ship the existing interactive installer next to the VST3/CLAP folders
+          Copy-Item "installer/setup.bat" (Join-Path $env:STAGE_DIR "setup.bat") -Force
+
+          Write-Host "Staged $($copied.Count) artefacts:"
+          $copied | Sort-Object | ForEach-Object { Write-Host "  $_" }
+
+      - name: Package
+        run: |
+          $zip = "out/PWSV-$env:VERSION-windows-x64.zip"
+          Compress-Archive -Path (Join-Path $env:STAGE_DIR "*") -DestinationPath $zip -Force
+          Get-Item $zip | Format-List Name, Length
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: PWSV-windows-x64
+          path: out/*.zip
+          if-no-files-found: error
+          retention-days: 14
+
+  # ── macOS universal (arm64 runner, x86_64 + arm64 binary) ─────────────────
+  macos:
+    name: macOS universal
+    needs: meta
+    runs-on: macos-15
+    env:
+      BUILD_DIR: build
+      STAGE_DIR: out/PWSV-${{ needs.meta.outputs.version }}-macos-universal
+      VERSION: ${{ needs.meta.outputs.version }}
+      # One binary that runs natively on Apple Silicon and Intel
+      OSX_ARCHS: "x86_64;arm64"
+      OSX_MIN: "11.0"
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+
+      - name: Show toolchain versions
+        run: |
+          cmake --version
+          xcodebuild -version
+          uname -m
+
+      - name: Configure
+        run: |
+          cmake -S . -B "$BUILD_DIR" \
+            -DCMAKE_BUILD_TYPE="$BUILD_TYPE" \
+            -DCMAKE_OSX_ARCHITECTURES="$OSX_ARCHS" \
+            -DCMAKE_OSX_DEPLOYMENT_TARGET="$OSX_MIN"
+
+      - name: Build
+        run: cmake --build "$BUILD_DIR" --config "$BUILD_TYPE" --parallel
+
+      - name: Stage binaries
+        run: |
+          set -euo pipefail
+          mkdir -p "$STAGE_DIR"
+
+          for target in PatoWebSocketEffect PatoWebSocketGenerator; do
+            root="$BUILD_DIR/${target}_artefacts/$BUILD_TYPE"
+            test -d "$root" || { echo "::error::Missing artefact folder $root"; exit 1; }
+
+            for kind in VST3 CLAP Standalone; do
+              if [ -d "$root/$kind" ]; then
+                mkdir -p "$STAGE_DIR/$kind"
+                # -R keeps the .vst3 / .clap / .app bundle structure intact
+                cp -R "$root/$kind/." "$STAGE_DIR/$kind/"
+              fi
+            done
+          done
+
+          cp packaging/install.sh "$STAGE_DIR/install.sh"
+          chmod +x "$STAGE_DIR/install.sh"
+
+          found=$(find "$STAGE_DIR" -maxdepth 2 \( -name "*.vst3" -o -name "*.clap" -o -name "*.app" \) | wc -l | tr -d ' ')
+          if [ "$found" -eq 0 ]; then
+            echo "::error::No plugin bundles were produced - check the build log."
+            exit 1
+          fi
+
+          # Confirm the binaries really are universal (x86_64 + arm64)
+          # CLAP is a file bundle -> <Name>.clap/Contents/MacOS/<Name>
+          # VST3 is a bundle       -> <Name>.vst3/Contents/MacOS/<Name>
+          find "$STAGE_DIR" -path "*/Contents/MacOS/*" -type f -perm -u+x -print0 |
+            while IFS= read -r -d '' bin; do
+              printf '%s: ' "$(basename "$bin")"
+              lipo -archs "$bin"
+            done | sort -u
+
+          find "$STAGE_DIR" -maxdepth 2 -print | sort
+
+      - name: Package
+        run: |
+          set -euo pipefail
+          # ditto keeps bundle metadata (_CodeSignature, extended attributes) valid
+          ditto -c -k --sequesterRsrc --keepParent \
+            "$STAGE_DIR" "out/PWSV-${VERSION}-macos-universal.zip"
+          ls -lh "out/PWSV-${VERSION}-macos-universal.zip"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: PWSV-macos-universal
+          path: out/*.zip
+          if-no-files-found: error
+          retention-days: 14
+
+  # ── Linux x86_64 (Ubuntu 22.04 → glibc 2.35 baseline) ─────────────────────
+  linux:
+    name: Linux x86_64
+    needs: meta
+    runs-on: ubuntu-22.04
+    env:
+      BUILD_DIR: build
+      STAGE_DIR: out/PWSV-${{ needs.meta.outputs.version }}-linux-x86_64
+      VERSION: ${{ needs.meta.outputs.version }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+
+      - name: Install JUCE dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            libasound2-dev \
+            libjack-jackd2-dev \
+            libfreetype-dev \
+            libfontconfig1-dev \
+            libx11-dev libxcomposite-dev libxcursor-dev libxext-dev \
+            libxinerama-dev libxrandr-dev libxrender-dev \
+            libglu1-mesa-dev mesa-common-dev \
+            ninja-build
+
+      - name: Show toolchain versions
+        run: |
+          cmake --version
+          ninja --version
+          c++ --version | head -n1
+          pkg-config --version
+
+      - name: Configure
+        run: |
+          cmake -S . -B "$BUILD_DIR" \
+            -G Ninja \
+            -DCMAKE_BUILD_TYPE="$BUILD_TYPE"
+
+      - name: Build
+        run: cmake --build "$BUILD_DIR" --config "$BUILD_TYPE" --parallel
+
+      - name: Stage binaries
+        run: |
+          set -euo pipefail
+          mkdir -p "$STAGE_DIR"
+
+          for target in PatoWebSocketEffect PatoWebSocketGenerator; do
+            root="$BUILD_DIR/${target}_artefacts/$BUILD_TYPE"
+            test -d "$root" || { echo "::error::Missing artefact folder $root"; exit 1; }
+
+            for kind in VST3 CLAP Standalone; do
+              if [ -d "$root/$kind" ]; then
+                mkdir -p "$STAGE_DIR/$kind"
+                cp -R "$root/$kind/." "$STAGE_DIR/$kind/"
+              fi
+            done
+          done
+
+          cp packaging/install.sh "$STAGE_DIR/install.sh"
+          chmod +x "$STAGE_DIR/install.sh"
+
+          found=$(find "$STAGE_DIR" -maxdepth 2 \( -name "*.vst3" -o -name "*.clap" \) | wc -l | tr -d ' ')
+          if [ "$found" -eq 0 ]; then
+            echo "::error::No plugin binaries were produced - check the build log."
+            exit 1
+          fi
+
+          find "$STAGE_DIR" -maxdepth 2 -print | sort
+
+      - name: Package
+        run: |
+          set -euo pipefail
+          tar -C out -czf "out/PWSV-${VERSION}-linux-x86_64.tar.gz" \
+            "$(basename "$STAGE_DIR")"
+          ls -lh "out/PWSV-${VERSION}-linux-x86_64.tar.gz"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: PWSV-linux-x86_64
+          path: out/*.tar.gz
+          if-no-files-found: error
+          retention-days: 14
+
+  # ── Draft GitHub Release (tags and manual runs with a version) ────────────
+  release:
+    name: Draft release
+    needs: [meta, windows, macos, linux]
+    if: startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && inputs.version != '')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      VERSION: ${{ needs.meta.outputs.version }}
+    steps:
+      - name: Download packages
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: PWSV-*
+          path: dist
+          merge-multiple: true
+
+      - name: Collect release assets
+        run: |
+          set -euo pipefail
+          mkdir -p release
+          find dist -maxdepth 1 -type f \( -name "*.zip" -o -name "*.tar.gz" \) -exec cp {} release/ \;
+          ls -lh release/
+
+      - name: Publish draft release
+        uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2.6.2
+        with:
+          # Tag pushes use their own tag; manual runs are tagged v<version>
+          tag_name: ${{ (startsWith(github.ref, 'refs/tags/') && github.ref_name) || format('v{0}', env.VERSION) }}
+          name: PWSV ${{ env.VERSION }}
+          draft: true
+          prerelease: false
+          generate_release_notes: true
+          files: release/*
