@@ -1,4 +1,10 @@
 build/
+build-*/
+dist/
+
+# Python helpers (scripts/*.py)
+__pycache__/
+*.py[cod]
 .cache/
 *.user
 *.suo

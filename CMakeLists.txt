@@ -1,5 +1,10 @@
 cmake_minimum_required(VERSION 3.22)
-project(PatoWebSocketVST VERSION 1.1.0 LANGUAGES C CXX)
+
+# PWSV_VERSION lets the build scripts / CI stamp the release version into the
+# plugin bundles (Info.plist, VST3 version) without editing this file.
+set(PWSV_VERSION "1.1.0" CACHE STRING "PWSV release version")
+
+project(PatoWebSocketVST VERSION ${PWSV_VERSION} LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
