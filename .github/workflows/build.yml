@@ -136,16 +136,18 @@ jobs:
             libxcomposite-dev libxrender-dev libglu1-mesa-dev mesa-common-dev \
             pkg-config ninja-build
 
-      # JUCE 8.0.6 and clap-juce-extensions are cloned by FetchContent, which is
-      # the slow part of a cold build. They only change when CMakeLists.txt does,
-      # so key the cache on that file.
-      - name: Cache FetchContent dependencies
+      # Only the git clones are cached. `build/_deps` also holds JUCE's own
+      # build tree (build/_deps/juce-build, which contains the juceaide tool
+      # CMake compiles *during* configure); caching that lets one run pick up
+      # another run's half-built or stale helper and fail with
+      # "Failed to configure/build juceaide".
+      - name: Cache FetchContent sources
         uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
         with:
-          path: build/_deps
-          key: deps-${{ runner.os }}-${{ matrix.arch }}-${{ hashFiles('CMakeLists.txt') }}
-          restore-keys: |
-            deps-${{ runner.os }}-${{ matrix.arch }}-
+          path: |
+            build/_deps/juce-src
+            build/_deps/clap-juce-extensions-src
+          key: deps-${{ runner.os }}-${{ hashFiles('CMakeLists.txt') }}
 
       - name: Configure and build
         env:
@@ -159,6 +161,23 @@ jobs:
             export PWSV_ARCHITECTURES="x86_64;arm64"
           fi
           python scripts/build.py --config "$BUILD_TYPE" --arch "$MATRIX_ARCH"
+
+      # CMake buries the interesting part of a configure failure inside its
+      # "Failed to build juceaide" blob. Surface it as a check annotation so
+      # the job page shows the real error without downloading logs.
+      - name: Summarise configure failure
+        if: failure()
+        run: |
+          {
+            echo "## Configure/build failed (${{ matrix.name }})"
+            for log in build/CMakeFiles/CMakeConfigureLog.yaml build/CMakeFiles/CMakeOutput.log; do
+              [ -f "$log" ] && { echo "### $log"; tail -n 40 "$log"; }
+            done
+            if command -v xcodebuild >/dev/null; then
+              xcodebuild -version
+            fi
+            cmake --version
+          } >> "$GITHUB_STEP_SUMMARY" 2>&1 || true
 
       - name: Report artefacts
         run: |
