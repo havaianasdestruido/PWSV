@@ -25,6 +25,7 @@
 #include <cmath>
 #include <algorithm>
 #include <string>
+#include <charconv>
 
 static void setNonBlocking(SOCKET s) {
 #ifdef _WIN32
@@ -369,8 +370,23 @@ void WebSocketServer::afterSend(const PositionData& p) {
 
 // ── JSON ─────────────────────────────────────────────────────
 
-static juce::String dbl(double v, int prec = 3) {
-    return juce::String(v, prec);
+struct DblFmt {
+    char buf[32];
+    size_t len;
+    DblFmt(double v, int prec = 3) {
+        auto [ptr, ec] = std::to_chars(buf, buf + sizeof(buf), v, std::chars_format::fixed, prec);
+        if (ec == std::errc()) {
+            len = static_cast<size_t>(ptr - buf);
+        } else {
+            buf[0] = '0';
+            len = 1;
+        }
+    }
+};
+
+static juce::String& operator<<(juce::String& s, const DblFmt& fmt) {
+    s.append(fmt.buf, fmt.len);
+    return s;
 }
 
 juce::String WebSocketServer::buildJson(const PositionData& p) {
@@ -381,12 +397,12 @@ juce::String WebSocketServer::buildJson(const PositionData& p) {
 
     json << "{"
          << "\"protocol\":2,"
-         << "\"time_sec\":"    << dbl(p.timeInSeconds)   << ","
+         << "\"time_sec\":"    << DblFmt(p.timeInSeconds)   << ","
          << "\"time_samples\":" << p.timeInSamples       << ","
-         << "\"ppq\":"         << dbl(p.ppq)             << ","
-         << "\"bpm\":"         << dbl(p.bpm, 1)          << ","
+         << "\"ppq\":"         << DblFmt(p.ppq)             << ","
+         << "\"bpm\":"         << DblFmt(p.bpm, 1)          << ","
          << "\"bar\":"         << p.barNumber            << ","
-         << "\"beat\":"        << dbl(p.beatInBar, 2)    << ","
+         << "\"beat\":"        << DblFmt(p.beatInBar, 2)    << ","
          << "\"time_sig\":["   << p.timeSigNum           << "," << p.timeSigDen << "],"
          << "\"playing\":"     << (p.isPlaying   ? "true" : "false") << ","
          << "\"recording\":"   << (p.isRecording ? "true" : "false") << ","
