@@ -6,6 +6,10 @@
   "scripts": {
     "build:docs": "cd docusaurus && npm run build && cd .. && rm -rf docs && cp -r docusaurus/build docs",
     "build": "npm run build:docs",
+    "build:plugins": "python3 scripts/build.py",
+    "build:plugins:debug": "python3 scripts/build.py --config Debug",
+    "build:plugins:pack": "python3 scripts/build.py --pack",
+    "build:plugins:verify": "python3 scripts/verify.py",
     "docs:dev": "cd docusaurus && npm start",
     "serve": "node server.js",
     "start": "node server.js"

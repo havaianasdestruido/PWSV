@@ -107,10 +107,46 @@ Visit:
 
 ## 🔨 Building the Plugins from Source
 
+Requires **CMake 3.22+**, **Python 3.9+**, **Git**, and a C++17 compiler
+(MSVC 2022 / Xcode 14+ / GCC 10+). On Linux also install the JUCE dev packages:
+
+```bash
+sudo apt-get install libasound2-dev libjack-jackd2-dev libx11-dev libxext-dev \
+  libxinerama-dev libxrandr-dev libxcursor-dev libfreetype6-dev libfontconfig1-dev libgl1-mesa-dev
+```
+
+```bash
+python3 scripts/build.py          # Windows: py -3 scripts\build.py
+```
+
+This configures, builds **VST3 + CLAP + Standalone** for the current OS and
+packages everything into `dist/`. Use `--config Debug` for faster iteration,
+`--no-pack` to stop after compiling, or run CMake directly:
+
 ```bash
 cmake -B build -DCMAKE_BUILD_TYPE=Release
 cmake --build build --config Release -j
 ```
+
+### Automated Builds
+
+The [`Build Plugins`](.github/workflows/build.yml) workflow builds and verifies
+the plugins on **Windows x64**, **macOS (universal)** and **Linux x64** for
+every push and pull request, and attaches the archives to a GitHub Release when
+you push a `v*` tag:
+
+```bash
+git tag v1.1.0 && git push origin v1.1.0
+```
+
+| Archive | Platform |
+|---|---|
+| `PWSV-<version>-windows-x86_64.zip` | Windows 10/11 x64 (includes `setup.bat`) |
+| `PWSV-<version>-macos-universal.zip` | macOS 11+ (Intel + Apple Silicon) |
+| `PWSV-<version>-linux-x86_64.tar.gz` | Linux x86_64 (glibc 2.35+) |
+
+See the [CI/CD documentation](docusaurus/docs/build-and-dev/ci-cd.md) for the
+full matrix, artefact layout and smoke tests.
 
 ---
 
