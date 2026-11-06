@@ -107,7 +107,7 @@ void WebSocketProcessorBase::processBlock(juce::AudioBuffer<float>& buffer, juce
         if (playHead) {
             auto info = playHead->getPosition();
             if (info) {
-                PositionData pd;
+                PositionData& pd = scratchPos_;
                 pd.timeInSeconds = info->getTimeInSeconds().orFallback(0.0);
                 pd.timeInSamples = info->getTimeInSamples().orFallback(0);
                 pd.ppq           = info->getPpqPosition().orFallback(0.0);

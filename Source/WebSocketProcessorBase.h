@@ -51,5 +51,8 @@ private:
     int currentBeatDiv_ = -1;
     double currentBpm_ = -1.0;
 
+    // Cached PositionData struct to avoid 1.5KB memset allocation on audio thread
+    PositionData scratchPos_;
+
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(WebSocketProcessorBase)
 };
