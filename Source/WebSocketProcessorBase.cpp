@@ -64,8 +64,7 @@ void WebSocketProcessorBase::processBlock(juce::AudioBuffer<float>& buffer, juce
     int port = static_cast<int>(portParam_->load(std::memory_order_relaxed));
     if (port != currentPort_) {
         currentPort_ = port;
-        server_->stop();
-        server_->start(port);
+        server_->setPort(port);
     }
 
     int numEvents = midi.getNumEvents();
