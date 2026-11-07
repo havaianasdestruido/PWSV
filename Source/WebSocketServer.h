@@ -13,6 +13,7 @@ public:
 
     bool start(int port);
     void stop();
+    void setPort(int port);
 
     void updatePosition(const PositionData& data);
     void setMode(int mode);
@@ -37,6 +38,8 @@ private:
     void sendToAll(const juce::String& payload);
     void disconnectClient(size_t index);
 
+    bool tryRebind();
+
     bool shouldSend();
     void afterSend(const PositionData& p);
     juce::String buildJson(const PositionData& p);
@@ -45,6 +48,7 @@ private:
 
     int listenSocket_ = -1;
     int port_         = 8080;
+    std::atomic<int> targetPort_{ -1 };
     std::vector<int> clients_;
     std::vector<uint8_t> sendBuffer_; // Pre-allocated buffer for sendToAll to avoid per-broadcast allocations
 

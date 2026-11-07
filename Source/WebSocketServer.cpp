@@ -99,6 +99,10 @@ void WebSocketServer::stop() {
     running_ = false;
 }
 
+void WebSocketServer::setPort(int port) {
+    targetPort_.store(port, std::memory_order_relaxed);
+}
+
 // ── setters (called from any thread) ─────────────────────────
 
 void WebSocketServer::updatePosition(const PositionData& d) {
@@ -146,11 +150,11 @@ PositionData WebSocketServer::getPosition() const {
 
 // ── main thread loop ─────────────────────────────────────────
 
-void WebSocketServer::run() {
-    initSockets();
+bool WebSocketServer::tryRebind() {
+    if (listenSocket_ != -1) { closesocket(listenSocket_); listenSocket_ = -1; }
 
     listenSocket_ = static_cast<int>(socket(AF_INET, SOCK_STREAM, IPPROTO_TCP));
-    if (listenSocket_ == -1) { lastError_ = "socket() failed"; return; }
+    if (listenSocket_ == -1) { lastError_ = "socket() failed"; return false; }
 
     int opt = 1;
     setsockopt(listenSocket_, SOL_SOCKET, SO_REUSEADDR,
@@ -168,23 +172,55 @@ void WebSocketServer::run() {
 
     if (bind(listenSocket_, (sockaddr*)&addr, sizeof(addr)) == SOCKET_ERROR) {
         lastError_ = "bind() failed on port " + juce::String(port_);
-        closesocket(listenSocket_); listenSocket_ = -1; return;
+        closesocket(listenSocket_); listenSocket_ = -1; return false;
     }
 
     if (listen(listenSocket_, 4) == SOCKET_ERROR) {
         lastError_ = "listen() failed";
-        closesocket(listenSocket_); listenSocket_ = -1; return;
+        closesocket(listenSocket_); listenSocket_ = -1; return false;
     }
 
     setNonBlocking(listenSocket_);
-    running_    = true;
+    return true;
+}
+
+void WebSocketServer::run() {
+    initSockets();
+
+    if (tryRebind()) {
+        running_ = true;
+    } else {
+        running_ = false;
+    }
+
     lastSendTime_ = std::chrono::steady_clock::now();
 
     while (!threadShouldExit()) {
+        int target = targetPort_.exchange(-1, std::memory_order_relaxed);
+        if (target != -1) {
+            port_ = target;
+
+            for (auto s : clients_) closesocket(s);
+            clients_.clear();
+            clientCount_.store(0, std::memory_order_relaxed);
+
+            if (!tryRebind()) {
+                running_ = false;
+                // Wait for the next port change request or shutdown
+                juce::Thread::sleep(100);
+                continue;
+            }
+            running_ = true;
+        }
+
         fd_set readSet;
         FD_ZERO(&readSet);
-        FD_SET(listenSocket_, &readSet);
-        SOCKET maxFd = listenSocket_;
+
+        SOCKET maxFd = -1;
+        if (listenSocket_ != -1) {
+            FD_SET(listenSocket_, &readSet);
+            maxFd = listenSocket_;
+        }
 
         for (auto s : clients_) {
             FD_SET(s, &readSet);
@@ -192,18 +228,24 @@ void WebSocketServer::run() {
         }
 
         timeval tv{ 0, 1000 };
-        select(
+
+        if (maxFd != -1) {
+            select(
 #ifdef _WIN32
-            0,
+                0,
 #else
-            static_cast<int>(maxFd + 1),
+                static_cast<int>(maxFd + 1),
 #endif
-            &readSet, nullptr, nullptr, &tv);
+                &readSet, nullptr, nullptr, &tv);
 
-        if (FD_ISSET(listenSocket_, &readSet))
-            acceptNewClients();
+            if (listenSocket_ != -1 && FD_ISSET(listenSocket_, &readSet))
+                acceptNewClients();
 
-        readFromClients(readSet);
+            readFromClients(readSet);
+        } else {
+            // No valid sockets to listen on, avoid CPU spinning
+            juce::Thread::sleep(100);
+        }
 
         if (!clients_.empty()) {
             if (shouldSend()) {
