@@ -64,3 +64,7 @@
 ## 2024-11-07 - [Non-Blocking Socket Rebinding in Audio Thread]
 **Learning:** In JUCE real-time audio threads (`processBlock`), calling thread lifecycle methods like `stop()` and `start()` directly leads to severe priority inversion and audio dropouts because these methods block waiting for network/background threads to exit or spawn.
 **Action:** Use an atomic variable (e.g. `std::atomic<int> targetPort_`) to signal the background thread. The background thread should continuously poll this atomic variable (using `.exchange()` to avoid race conditions) and perform the blocking operations (socket teardown and rebinding) safely outside the audio thread.
+
+## 2024-11-08 - Use juce::SpinLock over std::mutex in real-time threads
+**Learning:** In JUCE real-time audio threads (`processBlock`), avoiding blocking system calls is critical to prevent priority inversion and audio dropouts. Although `std::mutex::try_lock()` doesn't block directly, `std::mutex` operations can still involve kernel overhead or OS-level scheduling that's undesirable in the audio thread. `juce::SpinLock` is a lightweight, user-space lock that operates entirely on atomic variables, making its `tryEnter()` method completely lock-free and perfectly suited for fast, contention-avoidant updates from the audio thread.
+**Action:** Replace `std::mutex` with `juce::SpinLock` (and `tryEnter()`) when synchronizing telemetry/state between the real-time audio thread and a background thread, ensuring no kernel intervention occurs in the critical path.

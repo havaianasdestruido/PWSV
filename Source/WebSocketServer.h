@@ -2,7 +2,6 @@
 #include <juce_core/juce_core.h>
 #include "PositionData.h"
 #include <vector>
-#include <mutex>
 #include <atomic>
 #include <chrono>
 
@@ -52,7 +51,7 @@ private:
     std::vector<int> clients_;
     std::vector<uint8_t> sendBuffer_; // Pre-allocated buffer for sendToAll to avoid per-broadcast allocations
 
-    mutable std::mutex posLock_;
+    mutable juce::SpinLock posLock_;
     PositionData pos_;
 
     std::atomic<int>   mode_    { 0 };
