@@ -1,0 +1,245 @@
+name: Build Plugins
+
+# Builds the VST3 / CLAP / Standalone artefacts on Windows, macOS and Linux.
+#
+#  - push to main / arena/** / pull request -> build, verify, upload artefacts
+#  - tag vX.Y.Z                            -> build, verify, attach archives to a Release
+#  - manual run                            -> optional release upload
+#
+# Archive names follow the pwsv layout (see scripts/package.py):
+#   PWSV-<version>-windows-x86_64.zip
+#   PWSV-<version>-macos-universal.tar.gz
+#   PWSV-<version>-linux-x86_64.tar.gz
+
+on:
+  push:
+    branches: [main, "arena/**"]
+    tags: ["v*"]
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      upload_release:
+        description: "Attach the built archives to a GitHub Release ('nightly')"
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: build-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  BUILD_TYPE: Release
+
+jobs:
+  # ── Metadata: version comes from CMakeLists.txt, plus the release decision ──
+  meta:
+    name: Metadata
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.vars.outputs.version }}
+      publish: ${{ steps.vars.outputs.publish }}
+      tag: ${{ steps.vars.outputs.tag }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+
+      - name: Resolve version and release target
+        id: vars
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          REF_NAME: ${{ github.ref_name }}
+          UPLOAD_RELEASE: ${{ inputs.upload_release }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          # CMakeLists.txt is the single source of truth for the version.
+          version=$(sed -nE 's/^project\(.*VERSION[[:space:]]+([0-9][0-9.]*).*/\1/p' CMakeLists.txt | head -n1)
+          version=${version:-0.0.0}
+          tag=""
+          publish=false
+
+          if [ "${EVENT_NAME}" = "push" ] && [[ "${REF_NAME}" == v* ]]; then
+            version=${REF_NAME#v}
+            tag=${REF_NAME}
+            publish=true
+          elif [ "${EVENT_NAME}" = "workflow_dispatch" ] && [ "${UPLOAD_RELEASE}" = "true" ]; then
+            tag="nightly"
+            publish=true
+          fi
+
+          {
+            echo "version=${version}"
+            echo "tag=${tag}"
+            echo "publish=${publish}"
+          } >> "$GITHUB_OUTPUT"
+          echo "Building PWSV ${version} (publish release: ${publish})"
+
+  # ── Native builds: one job per operating system ────────────────────────────
+  build:
+    name: ${{ matrix.name }}
+    needs: meta
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Windows x64
+            os: windows-2022 # stable MSVC 2022 image (windows-latest now tracks VS 2026)
+            platform: windows
+            arch: x86_64
+            artifact: PWSV-windows-x86_64
+          - name: macOS universal
+            os: macos-15 # arm64 runner; pin the image so a `-latest` bump cannot break the universal build
+            platform: macos
+            arch: universal
+            artifact: PWSV-macos-universal
+          - name: Linux x64
+            os: ubuntu-22.04 # oldest supported glibc -> runs on newer distros
+            platform: linux
+            arch: x86_64
+            artifact: PWSV-linux-x86_64
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+        with:
+          python-version: "3.12"
+
+      # Need to come before the dependency-cache restore: JUCE caches the
+      # pkg-config lookups for its optional libraries inside build/_deps, so a
+      # cache taken on a runner with only half of these installed would keep
+      # breaking later builds.
+      #
+      # JUCE pulls these in at configure time: missing ALSA/X11 headers fail the
+      # juceaide build, missing pkg-config fails `FindPkgConfig`.
+      - name: Install Linux build dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            libasound2-dev libjack-jackd2-dev libx11-dev libxext-dev \
+            libxinerama-dev libxrandr-dev libxcursor-dev libfreetype6-dev \
+            libfontconfig1-dev libgl1-mesa-dev \
+            libxcomposite-dev libxrender-dev libglu1-mesa-dev mesa-common-dev \
+            pkg-config ninja-build
+
+      # Only the git clones are cached. `build/_deps` also holds JUCE's own
+      # build tree (build/_deps/juce-build, which contains the juceaide tool
+      # CMake compiles *during* configure); caching that lets one run pick up
+      # another run's half-built or stale helper and fail with
+      # "Failed to configure/build juceaide".
+      - name: Cache FetchContent sources
+        uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
+        with:
+          path: |
+            build/_deps/juce-src
+            build/_deps/clap-juce-extensions-src
+          key: deps-${{ runner.os }}-${{ hashFiles('CMakeLists.txt') }}
+
+      - name: Configure and build
+        env:
+          MATRIX_PLATFORM: ${{ matrix.platform }}
+          MATRIX_ARCH: ${{ matrix.arch }}
+        run: |
+          # macOS runs on an arm64 runner but ships a universal binary so the
+          # same archive works on Intel and Apple Silicon. Windows/Linux build
+          # natively in their normal single-arch layout.
+          if [ "$MATRIX_PLATFORM" = "macos" ]; then
+            export PWSV_ARCHITECTURES="x86_64;arm64"
+          fi
+          python scripts/build.py --config "$BUILD_TYPE" --arch "$MATRIX_ARCH"
+
+      # CMake buries the interesting part of a configure failure inside its
+      # "Failed to build juceaide" blob. Surface it as a check annotation so
+      # the job page shows the real error without downloading logs.
+      - name: Summarise configure failure
+        if: failure()
+        run: |
+          {
+            echo "## Configure/build failed (${{ matrix.name }})"
+            for log in build/CMakeFiles/CMakeConfigureLog.yaml build/CMakeFiles/CMakeOutput.log; do
+              [ -f "$log" ] && { echo "### $log"; tail -n 40 "$log"; }
+            done
+            if command -v xcodebuild >/dev/null; then
+              xcodebuild -version
+            fi
+            cmake --version
+          } >> "$GITHUB_STEP_SUMMARY" 2>&1 || true
+
+      - name: Report artefacts
+        run: |
+          {
+            echo "### ${{ matrix.name }}"
+            echo '```'
+            find dist -maxdepth 3 | sort
+            echo '```'
+            echo '```'
+            ls -lh dist
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Smoke test artefacts
+        env:
+          MATRIX_PLATFORM: ${{ matrix.platform }}
+        run: |
+          extra=""
+          if [ "$MATRIX_PLATFORM" = "macos" ]; then
+            extra="--universal"
+          fi
+          python scripts/verify.py --dist dist --platform "$MATRIX_PLATFORM" $extra
+
+      - name: Upload artefacts
+        uses: actions/upload-artifact@65c4c4a1ddee5b72f698fdd19549f0f0fb45cf08 # v4.6.0
+        with:
+          name: ${{ matrix.artifact }}
+          path: |
+            dist/PWSV-*
+            !dist/PWSV-*/.verify-*
+          if-no-files-found: error
+          retention-days: 30
+
+  # ── Publish the archives as a GitHub Release (tag push / manual opt-in) ────
+  release:
+    name: Publish release
+    needs: [meta, build]
+    if: needs.meta.outputs.publish == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download all artefacts
+        uses: actions/download-artifact@b14cf4c92620c250e1c074ab0a5800e37df86765 # v4.2.0
+        with:
+          path: release
+          merge-multiple: true
+
+      - name: Verify checksums
+        run: |
+          ls -lh release
+          cd release
+          sha256sum -c ./*.sha256
+
+      - name: Publish to GitHub Releases
+        uses: softprops/action-gh-release@a06a81a03ee405af7f2048a818ed3f03bbf83c7b # v2.5.0
+        with:
+          tag_name: ${{ needs.meta.outputs.tag }}
+          name: PWSV ${{ needs.meta.outputs.version }}
+          generate_release_notes: true
+          fail_on_unmatched_files: false
+          files: |
+            release/PWSV-*.zip
+            release/PWSV-*.tar.gz
+            release/PWSV-*.sha256
