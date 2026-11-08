@@ -112,13 +112,13 @@ void WebSocketServer::updatePosition(const PositionData& d) {
     if (isPlaying_.load(std::memory_order_relaxed) != d.isPlaying)
         isPlaying_.store(d.isPlaying, std::memory_order_relaxed);
 
-    // try_lock prevents priority inversion / blocking in the audio thread.
+    // tryEnter prevents priority inversion / blocking in the audio thread.
     // If the lock is held by the server thread, we simply skip this update.
     // Since processBlock runs much faster than the websocket send rate,
     // skipping an occasional update is perfectly fine and avoids audio dropouts.
-    if (posLock_.try_lock()) {
+    if (posLock_.tryEnter()) {
         pos_ = d;
-        posLock_.unlock();
+        posLock_.exit();
     }
 }
 
@@ -144,7 +144,7 @@ bool WebSocketServer::isRunning()              const { return running_.load(); }
 juce::String WebSocketServer::getLastError()   const { return lastError_; }
 
 PositionData WebSocketServer::getPosition() const {
-    std::lock_guard<std::mutex> lk(posLock_);
+    juce::SpinLock::ScopedLockType lk(posLock_);
     return pos_;
 }
 
