@@ -68,3 +68,7 @@
 ## 2024-11-08 - Use juce::SpinLock over std::mutex in real-time threads
 **Learning:** In JUCE real-time audio threads (`processBlock`), avoiding blocking system calls is critical to prevent priority inversion and audio dropouts. Although `std::mutex::try_lock()` doesn't block directly, `std::mutex` operations can still involve kernel overhead or OS-level scheduling that's undesirable in the audio thread. `juce::SpinLock` is a lightweight, user-space lock that operates entirely on atomic variables, making its `tryEnter()` method completely lock-free and perfectly suited for fast, contention-avoidant updates from the audio thread.
 **Action:** Replace `std::mutex` with `juce::SpinLock` (and `tryEnter()`) when synchronizing telemetry/state between the real-time audio thread and a background thread, ensuring no kernel intervention occurs in the critical path.
+
+## 2024-11-20 - Use std::string over juce::String for JSON WebSocket payloads
+**Learning:** `juce::String::preallocateBytes()` alone does not prevent all heap allocations if the underlying JUCE string builder logic creates temporary blocks or if UTF-8 conversion (`toRawUTF8()`) is repeatedly called. Constructing the 4KB JSON payload with `std::string` and `<charconv>` into a cached class member (`jsonBuffer_`) avoids JUCE string overhead completely.
+**Action:** Use a pre-allocated `std::string` (via `reserve()` and `clear()`) instead of `juce::String` for the WebSocket JSON broadcast payload to eliminate dynamic memory allocations entirely on the send thread.
