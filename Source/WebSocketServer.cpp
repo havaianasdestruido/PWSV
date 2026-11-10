@@ -382,9 +382,11 @@ void WebSocketServer::sendToAll(const std::string& payload) {
 // ── rate / beat logic ────────────────────────────────────────
 
 bool WebSocketServer::shouldSend() {
-    int m = mode_.load();
-    bool playing = isPlaying_.load();
-    double ppq = currentPpq_.load();
+    // Optimization: Use relaxed memory order for read-only atomic loads to
+    // prevent unnecessary memory synchronization barrier overhead.
+    int m = mode_.load(std::memory_order_relaxed);
+    bool playing = isPlaying_.load(std::memory_order_relaxed);
+    double ppq = currentPpq_.load(std::memory_order_relaxed);
 
     if (m == 1) {
         bool justStarted = playing && !wasPlaying_;
@@ -392,7 +394,7 @@ bool WebSocketServer::shouldSend() {
         if (!playing) return false;
         if (justStarted) return true;
 
-        double div = beatDivisionPpq[beatDiv_.load()];
+        double div = beatDivisionPpq[beatDiv_.load(std::memory_order_relaxed)];
         int cur = static_cast<int>(std::floor(ppq / div));
         int lst = static_cast<int>(std::floor(lastSentPpq_ / div));
         return cur != lst;
@@ -401,7 +403,7 @@ bool WebSocketServer::shouldSend() {
     wasPlaying_ = playing;
     auto now    = std::chrono::steady_clock::now();
     double elapsed = std::chrono::duration<double>(now - lastSendTime_).count();
-    double hz = static_cast<double>(rate_.load());
+    double hz = static_cast<double>(rate_.load(std::memory_order_relaxed));
     if (hz <= 0.0) hz = 1.0;
     return elapsed >= (1.0 / hz);
 }
@@ -429,6 +431,14 @@ struct DblFmt {
 
 static std::string& operator<<(std::string& s, const char* str) {
     s.append(str);
+    return s;
+}
+
+template <size_t N>
+static inline std::string& operator<<(std::string& s, const char (&str)[N]) {
+    // Optimization: Resolves string literal lengths at compile time (N - 1)
+    // avoiding runtime strlen() overhead when building JSON strings.
+    s.append(str, N - 1);
     return s;
 }
 
