@@ -2,6 +2,7 @@
 #include <juce_core/juce_core.h>
 #include "PositionData.h"
 #include <vector>
+#include <string>
 #include <atomic>
 #include <chrono>
 
@@ -45,14 +46,14 @@ private:
     void acceptNewClients();
     void readFromClients(fd_set& readSet);
     bool performHandshake(int sock);
-    void sendToAll(const juce::String& payload);
+    void sendToAll(const std::string& payload);
     void disconnectClient(size_t index);
 
     bool tryRebind();
 
     bool shouldSend();
     void afterSend(const PositionData& p);
-    juce::String buildJson(const PositionData& p);
+    const std::string& buildJson(const PositionData& p);
 
     PositionData getPosition() const;
 
@@ -60,7 +61,8 @@ private:
     int port_         = 8080;
     std::atomic<int> targetPort_{ -1 };
     std::vector<int> clients_;
-    std::vector<uint8_t> sendBuffer_; // Pre-allocated buffer for sendToAll to avoid per-broadcast allocations
+    std::vector<uint8_t> sendBuffer_;
+    std::string jsonBuffer_; // Pre-allocated buffer for sendToAll to avoid per-broadcast allocations
 
     mutable juce::SpinLock posLock_;
     PositionData pos_;

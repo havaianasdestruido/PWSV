@@ -26,6 +26,7 @@
 #include <algorithm>
 #include <string>
 #include <charconv>
+#include <type_traits>
 
 static void setNonBlocking(SOCKET s) {
 #ifdef _WIN32
@@ -354,10 +355,10 @@ void WebSocketServer::disconnectClient(size_t idx) {
 
 // ── send ─────────────────────────────────────────────────────
 
-void WebSocketServer::sendToAll(const juce::String& payload) {
+void WebSocketServer::sendToAll(const std::string& payload) {
     if (clients_.empty()) return;
-    auto utf8 = payload.toRawUTF8();
-    auto len = static_cast<size_t>(payload.getNumBytesAsUTF8());
+    auto utf8 = reinterpret_cast<const uint8_t*>(payload.data());
+    auto len = payload.size();
     sendBuffer_.clear();
     sendBuffer_.reserve(10 + len);
     sendBuffer_.push_back(0x81);
@@ -426,18 +427,33 @@ struct DblFmt {
     }
 };
 
-static juce::String& operator<<(juce::String& s, const DblFmt& fmt) {
+static std::string& operator<<(std::string& s, const char* str) {
+    s.append(str);
+    return s;
+}
+
+static std::string& operator<<(std::string& s, const DblFmt& fmt) {
     s.append(fmt.buf, fmt.len);
     return s;
 }
 
-juce::String WebSocketServer::buildJson(const PositionData& p) {
-    juce::String json;
-    // Pre-allocate enough memory to hold maximum possible notes without reallocations.
-    // Base JSON is ~200 chars. Each note is ~30 chars. Max 128 notes. Total ~4000 chars.
-    json.preallocateBytes(4096);
+template<typename T, std::enable_if_t<std::is_integral_v<T>, int> = 0>
+static std::string& operator<<(std::string& s, T v) {
+    char buf[32];
+    auto [ptr, ec] = std::to_chars(buf, buf + sizeof(buf), v);
+    if (ec == std::errc()) {
+        s.append(buf, ptr - buf);
+    }
+    return s;
+}
 
-    json << "{"
+const std::string& WebSocketServer::buildJson(const PositionData& p) {
+    if (jsonBuffer_.capacity() < 4096) {
+        jsonBuffer_.reserve(4096);
+    }
+    jsonBuffer_.clear();
+
+    jsonBuffer_ << "{"
          << "\"protocol\":2,"
          << "\"time_sec\":"    << DblFmt(p.timeInSeconds)   << ","
          << "\"time_samples\":" << p.timeInSamples       << ","
@@ -452,14 +468,14 @@ juce::String WebSocketServer::buildJson(const PositionData& p) {
          << "\"notes\":[";
 
     for (int i = 0; i < p.activeNoteCount; ++i) {
-        if (i > 0) json << ",";
-        json << "{"
+        if (i > 0) jsonBuffer_ << ",";
+        jsonBuffer_ << "{"
              << "\"note\":" << p.activeNoteNumbers[i]   << ","
              << "\"vel\":"  << p.activeNoteVelocities[i] << ","
              << "\"ch\":"   << (p.activeNoteChannels[i] + 1)
              << "}";
     }
-    json << "]}";
+    jsonBuffer_ << "]}";
 
-    return json;
+    return jsonBuffer_;
 }
