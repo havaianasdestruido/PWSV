@@ -72,3 +72,7 @@
 ## 2024-11-20 - Use std::string over juce::String for JSON WebSocket payloads
 **Learning:** `juce::String::preallocateBytes()` alone does not prevent all heap allocations if the underlying JUCE string builder logic creates temporary blocks or if UTF-8 conversion (`toRawUTF8()`) is repeatedly called. Constructing the 4KB JSON payload with `std::string` and `<charconv>` into a cached class member (`jsonBuffer_`) avoids JUCE string overhead completely.
 **Action:** Use a pre-allocated `std::string` (via `reserve()` and `clear()`) instead of `juce::String` for the WebSocket JSON broadcast payload to eliminate dynamic memory allocations entirely on the send thread.
+
+## 2024-11-10 - [String Literal Length Resolution at Compile Time]
+**Learning:** [When assembling JSON payloads with `std::string::append` or custom `operator<<` in high-frequency loops, dynamic strings trigger a runtime `strlen` call to determine the literal length. Using a template `const char (&str)[N]` can resolve this length at compile time, skipping unnecessary overhead.]
+**Action:** [Next time you find tight loops with multiple literal appends (e.g. `s << "{\"key\": "`), add a compile-time template overload `template <size_t N> inline std::string& operator<<(std::string& s, const char (&str)[N])` to resolve string lengths safely as `N-1`.]
