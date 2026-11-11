@@ -76,3 +76,7 @@
 ## 2024-11-10 - [String Literal Length Resolution at Compile Time]
 **Learning:** [When assembling JSON payloads with `std::string::append` or custom `operator<<` in high-frequency loops, dynamic strings trigger a runtime `strlen` call to determine the literal length. Using a template `const char (&str)[N]` can resolve this length at compile time, skipping unnecessary overhead.]
 **Action:** [Next time you find tight loops with multiple literal appends (e.g. `s << "{\"key\": "`), add a compile-time template overload `template <size_t N> inline std::string& operator<<(std::string& s, const char (&str)[N])` to resolve string lengths safely as `N-1`.]
+
+## 2026-11-11 - Prevent heap allocations during MIDI message extraction
+**Learning:** Calling `metadata.getMessage()` inside the high-frequency `processBlock` audio thread creates a new `juce::MidiMessage` object, which under the hood can result in heap allocations or at least unnecessary copying of data, especially for short messages like Note On/Off where the raw bytes are readily available.
+**Action:** When extracting Note On/Off information from a `juce::MidiBuffer` in the `processBlock` thread, avoid `getMessage()`. Instead, access the raw byte array directly via `metadata.data` and parse the MIDI status byte (`status & 0xF0`) and data bytes manually to remain lock-free and allocation-free.
