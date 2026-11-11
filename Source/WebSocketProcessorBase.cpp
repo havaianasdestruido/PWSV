@@ -74,21 +74,32 @@ void WebSocketProcessorBase::processBlock(juce::AudioBuffer<float>& buffer, juce
     }
 
     for (const auto metadata : midi) {
-        auto msg = metadata.getMessage();
-        int note = msg.getNoteNumber();
-        int ch   = msg.getChannel();
-        if (msg.isNoteOn()) {
-            if (activeNotes_.size() < PositionData::MAX_NOTES) {
-                activeNotes_.push_back({ note, msg.getVelocity(), ch });
-            }
-        } else if (msg.isNoteOff()) {
-            for (size_t i = 0; i < activeNotes_.size(); ) {
-                if (activeNotes_[i].note == note && activeNotes_[i].channel == ch) {
-                    // O(1) removal, avoids vector shifting in audio thread
-                    activeNotes_[i] = activeNotes_.back();
-                    activeNotes_.pop_back();
-                } else {
-                    ++i;
+        if (metadata.numBytes >= 3) {
+            const uint8_t* data = metadata.data;
+            uint8_t status = data[0] & 0xF0;
+
+            if (status == 0x90 || status == 0x80) {
+                int ch   = (data[0] & 0x0F) + 1; // 1-based channel index
+                int note = data[1];
+                int vel  = data[2];
+
+                bool isNoteOn = (status == 0x90 && vel > 0);
+                bool isNoteOff = (status == 0x80 || (status == 0x90 && vel == 0));
+
+                if (isNoteOn) {
+                    if (activeNotes_.size() < PositionData::MAX_NOTES) {
+                        activeNotes_.push_back({ note, vel, ch });
+                    }
+                } else if (isNoteOff) {
+                    for (size_t i = 0; i < activeNotes_.size(); ) {
+                        if (activeNotes_[i].note == note && activeNotes_[i].channel == ch) {
+                            // O(1) removal, avoids vector shifting in audio thread
+                            activeNotes_[i] = activeNotes_.back();
+                            activeNotes_.pop_back();
+                        } else {
+                            ++i;
+                        }
+                    }
                 }
             }
         }
